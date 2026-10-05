@@ -1,0 +1,14 @@
+[
+  { "text": "Which planet is known as the Red Planet?", "options": ["Venus", "Mars", "Jupiter", "Mercury"], "correct": 1 },
+  { "text": "How many continents are there on Earth?", "options": ["5", "6", "7", "8"], "correct": 2 },
+  { "text": "Which is the largest ocean on Earth?", "options": ["Pacific", "Atlantic", "Indian", "Arctic"], "correct": 0 },
+  { "text": "What is the chemical symbol for gold?", "options": ["Ag", "Au", "Gd", "Go"], "correct": 1 },
+  { "text": "Who painted the Mona Lisa?", "options": ["Michelangelo", "Raphael", "Botticelli", "Leonardo da Vinci"], "correct": 3 },
+  { "text": "Which is the longest river in Africa?", "options": ["Congo", "Niger", "Nile", "Zambezi"], "correct": 2 },
+  { "text": "In which country is Mount Kilimanjaro?", "options": ["Kenya", "Tanzania", "Uganda", "Ethiopia"], "correct": 1 },
+  { "text": "How many players from one team are on the pitch in a football match?", "options": ["11", "9", "10", "12"], "correct": 0 },
+  { "text": "What is the hardest natural substance?", "options": ["Quartz", "Topaz", "Steel", "Diamond"], "correct": 3 },
+  { "text": "Which language has the most native speakers?", "options": ["English", "Spanish", "Mandarin Chinese", "Hindi"], "correct": 2 },
+  { "text": "What is the smallest prime number?", "options": ["1", "2", "3", "5"], "correct": 1 },
+  { "text": "Which gas do plants take in for photosynthesis?", "options": ["Carbon dioxide", "Oxygen", "Nitrogen", "Hydrogen"], "correct": 0, "seconds": 15 }
+]

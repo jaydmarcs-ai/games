@@ -1,0 +1,12 @@
+{
+  "name": "guess-the-quiz",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/sim.mjs",
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "@netlify/blobs": ">=8.2.0"
+  }
+}

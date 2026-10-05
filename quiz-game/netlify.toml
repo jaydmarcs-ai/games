@@ -1,0 +1,9 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+# The host screen lives at /host
+[[redirects]]
+  from = "/host"
+  to = "/host.html"
+  status = 200
