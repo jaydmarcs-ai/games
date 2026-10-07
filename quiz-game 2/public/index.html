@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Quiz</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="conn" class="conn" hidden>Reconnecting…</div>
+<div id="app"></div>
+<div id="toast" class="toast" hidden style="bottom:24px"></div>
+<script src="/shared.js"></script>
+<script>
+// This phone is the team's phone. A random id kept on the device is how the server
+// knows it is still the same team's phone after a refresh or a dropped connection.
+const dev = localStorage.getItem('quizDevice') || (() => {
+  const d = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('quizDevice', d);
+  return d;
+})();
+let teamId = localStorage.getItem('quizTeam') || '';
+let S = null, joinErr = '', needsConfirm = null, pending = null, selMember = null, lastIndex = '', toastTimer;
+const app = $('#app');
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
+}
+
+const poller = startPolling({
+  url: (since) => `/api/state?teamId=${encodeURIComponent(teamId)}&deviceId=${encodeURIComponent(dev)}` + (since !== null ? `&since=${since}` : ''),
+  onState: (s) => {
+    S = s;
+    if (!s.me && teamId) { teamId = ''; localStorage.removeItem('quizTeam'); } // removed by the host
+    const qKey = s.round ? s.round.n + ':' + s.round.qNum + ':' + s.phase : 'none';
+    if (s.phase === 'question' || s.phase === 'pick') { if (qKey !== lastIndex) { lastIndex = qKey; pending = null; selMember = null; } }
+    render();
+  },
+  onStatus: showConn,
+});
+
+async function joinTeam(name, members, takeover) {
+  joinErr = ''; needsConfirm = null;
+  try {
+    const r = await post('/api/join', { name, members, deviceId: dev, takeover: !!takeover });
+    teamId = r.teamId;
+    localStorage.setItem('quizTeam', teamId);
+    poller.reset();
+  } catch (e) {
+    if (e.code === 'exists') needsConfirm = { name, members };
+    joinErr = e.message;
+    render();
+  }
+}
+
+async function leave() {
+  try { await post('/api/leave', { deviceId: dev }); } catch (e) { /* ignore */ }
+  teamId = ''; localStorage.removeItem('quizTeam');
+  poller.reset();
+}
+
+const leastUsed = (turns) => turns.indexOf(Math.min(...turns));
+const chosenMember = () => (selMember !== null ? selMember : leastUsed(S.me.turns));
+
+async function pick(i) {
+  if (pending !== null || S.me.answer !== null) return;
+  pending = { choice: i, member: chosenMember() };
+  navigator.vibrate && navigator.vibrate(30);
+  render();
+  try { await post('/api/answer', { teamId, deviceId: dev, choice: i, member: pending.member }); poller.refresh(); }
+  catch (e) { pending = null; toast(e.message); render(); }
+}
+
+async function pickCat(id) {
+  try { await post('/api/pick', { teamId, deviceId: dev, category: id }); poller.refresh(); }
+  catch (e) { toast(e.message); }
+}
+
+// ---------- Views ----------
+function joinV() {
+  const lobby = S.phase === 'lobby';
+  return `<main class="p">
+    <h1>Guess the Quiz</h1>
+    <p class="note">${lobby
+      ? 'One phone per team. Enter your team name and who is on the team (1 to ' + S.teamSize + ' people).'
+      : 'The game is already running. To get back into your team, type its exact name.'}</p>
+    <form id="jf">
+      <label for="nm">Team name</label>
+      <input id="nm" maxlength="24" autocomplete="off" placeholder="Your team name">
+      ${lobby ? `<label for="m0">Team members</label>
+      <div class="memfields">${Array.from({ length: S.teamSize }, (_, i) =>
+        `<input class="mem" id="m${i}" maxlength="20" autocomplete="off" placeholder="Member ${i + 1}${i === 0 ? '' : ' (optional)'}">`).join('')}</div>` : ''}
+      <button class="btn big">${lobby ? 'Join game' : 'Rejoin my team'}</button>
+    </form>
+    ${needsConfirm ? `<div class="confirm"><p>${esc(joinErr)}</p><button class="btn" id="takeover">Yes, this is my team's phone</button></div>` : `<p class="err">${esc(joinErr)}</p>`}
+  </main>`;
+}
+
+function lobbyV() {
+  const m = S.me;
+  return `<main class="p">
+    <h1>${esc(m.name)}</h1>
+    <p class="status">You're in.</p>
+    <p class="stat">${esc(m.members.join(', '))}</p>
+    <p class="stat">${S.teams.length} of ${S.maxTeams} teams have joined.</p>
+    <p class="note">Waiting for ${esc(S.adminName)} to start the game.</p>
+    <button class="btn ghost" id="leave">Switch team</button>
+  </main>`;
+}
+
+function questionV() {
+  const m = S.me;
+  const locked = m.answer !== null || pending !== null;
+  const a = m.answer || pending;                 // { choice, member }
+  const sel = locked ? a.member : chosenMember();
+  return `<main class="p ${S.question.image ? 'hasimg' : ''}">
+    <div class="timer">${meterHTML(S.seconds)}<span id="secs" class="secs"></span></div>
+    <p class="stat">${esc(m.name)}, round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}</p>
+    ${S.question.category ? `<p class="catline">${esc(S.question.category)}${S.question.chosenBy ? ', picked by ' + esc(S.question.chosenBy) : ', picked at random'}</p>` : ''}
+    <h1 class="qtext">${esc(S.question.text)}</h1>
+    ${S.question.image ? imgHTML(S.question.image) : ''}
+    <div class="who"><p>${locked ? 'Answering' : 'Who is answering?'}</p>
+      <div class="chips" role="group" aria-label="Who is answering">${m.members.map((name, i) =>
+        `<button class="chip" data-m="${i}" aria-pressed="${sel === i}" ${locked ? 'disabled' : ''}>${esc(name)}${m.turns[i] ? `<span class="ct">${m.turns[i]}x</span>` : ''}</button>`).join('')}</div></div>
+    <div class="opts">${S.question.options.map((o, i) =>
+      `<button class="opt ${locked && a.choice === i ? 'mine' : ''}" data-i="${i}" ${locked ? 'disabled' : ''}><span class="l">${LET[i]}</span><span class="t">${esc(o)}</span></button>`).join('')}</div>
+    <p class="status">${locked ? `Locked in: ${LET[a.choice]}, answered by ${esc(m.members[a.member])}. Waiting for the other teams.` : 'Pick who answers, then tap an answer.'}</p>
+  </main>`;
+}
+
+function revealV() {
+  const m = S.me, r = m.result, q = S.question, rv = S.reveal;
+  let head;
+  if (r.correct) head = `<p class="big-result good">Correct! +${r.gain}</p>`;
+  else if (r.choice === null) head = '<p class="big-result bad">No answer in time</p>';
+  else head = '<p class="big-result bad">Not this time</p>';
+  return `<main class="p">
+    ${head}
+    <p class="status">The answer was ${LET[rv.correct]}, ${esc(q.options[rv.correct])}.</p>
+    ${r.member ? `<p class="stat">${esc(r.member)} answered for ${esc(m.name)}.</p>` : ''}
+    <p class="stat">${esc(m.name)}: rank ${m.rank} of ${S.teams.length}, ${m.score} points.</p>
+    <p class="note">${rv.isLast ? `Waiting for ${esc(S.adminName)} to show the final results.` : 'Next question coming up.'}</p>
+  </main>`;
+}
+
+function pickV() {
+  const m = S.me, p = S.pick;
+  if (m.isChooser) {
+    return `<main class="p">
+      <div class="timer">${meterHTML(p.seconds)}<span id="secs" class="secs"></span></div>
+      <p class="roundline">Round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}</p>
+      <h1>Your turn to choose</h1>
+      <p class="note">Pick a category. Every team answers the question.</p>
+      <div class="cats">${p.categories.map((c) =>
+        `<button class="cat" data-cat="${esc(c.id)}" ${c.left ? '' : 'disabled'}>${esc(c.name)}<small>${c.left ? c.left + ' left' : 'none left'}</small></button>`).join('')}</div>
+    </main>`;
+  }
+  return `<main class="p">
+    <div class="timer">${meterHTML(p.seconds)}<span id="secs" class="secs"></span></div>
+    <p class="roundline">Round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}</p>
+    <h1>${esc(p.chooserName || 'A team')} is choosing the category</h1>
+    <p class="note">Get ready. Everyone answers the next question.</p>
+  </main>`;
+}
+
+function betweenV() {
+  const m = S.me, b = S.between;
+  return `<main class="p">
+    ${b.breakEndsAt
+      ? `<p class="roundline">Break: back in</p><div class="brk" id="brk"></div><p class="note" id="brknote"></p>`
+      : `<h1>Round ${b.done.n} complete</h1>`}
+    <p class="status">${esc(m.name)}: rank ${m.rank} of ${S.teams.length}, ${m.score} points.</p>
+    <p class="stat">Next: Round ${b.next.n}, ${esc(b.next.title)}.</p>
+    <p class="note">${esc(b.next.blurb)}</p>
+  </main>`;
+}
+
+function finalV() {
+  const m = S.me, f = S.final;
+  const won = f.winners.includes(m.id);
+  const top = S.teams.slice(0, 3).map((t) => `<li><span>${t.rank}. ${esc(t.name)}</span><span>${t.score}</span></li>`).join('');
+  return `<main class="p">
+    <p class="big-result ${won ? 'good' : ''}">${won ? 'You are the champions!' : 'Game over'}</p>
+    <p class="status">${esc(m.name)}: rank ${m.rank} of ${S.teams.length}, ${m.score} points.</p>
+    <ul class="podium">${top}</ul>
+    <p class="note">Thanks for playing.</p>
+  </main>`;
+}
+
+function render() {
+  if (!S) return;
+  // Keep whatever is being typed (the poll can redraw the page at any moment).
+  const keep = {};
+  app.querySelectorAll('input').forEach((el) => { keep[el.id] = el.value; });
+  const focused = document.activeElement && document.activeElement.id;
+
+  let html;
+  if (!S.me) html = joinV();
+  else if (S.phase === 'lobby') html = lobbyV();
+  else if (S.phase === 'question') html = questionV();
+  else if (S.phase === 'reveal') html = revealV();
+  else if (S.phase === 'pick') html = pickV();
+  else if (S.phase === 'between') html = betweenV();
+  else html = finalV();
+  app.innerHTML = html;
+
+  app.querySelectorAll('input').forEach((el) => { if (keep[el.id] !== undefined) el.value = keep[el.id]; });
+  if (focused && $('#' + focused)) $('#' + focused).focus();
+
+  const form = $('#jf');
+  if (form) form.onsubmit = (e) => {
+    e.preventDefault();
+    joinTeam($('#nm').value, [...app.querySelectorAll('.mem')].map((el) => el.value), false);
+  };
+  const tk = $('#takeover');
+  if (tk) tk.onclick = () => joinTeam(needsConfirm.name, needsConfirm.members, true);
+  app.querySelectorAll('.chip').forEach((el) => { el.onclick = () => { selMember = Number(el.dataset.m); render(); }; });
+  app.querySelectorAll('.opt').forEach((el) => { el.onclick = () => pick(Number(el.dataset.i)); });
+  app.querySelectorAll('[data-cat]').forEach((el) => { el.onclick = () => pickCat(el.dataset.cat); });
+  const lv = $('#leave');
+  if (lv) lv.onclick = leave;
+  if (S.between) preload(S.between.preload); // download the next round's images during the break
+  tickAll(S);
+}
+
+setInterval(() => tickAll(S), 100);
+</script>
+</body>
+</html>

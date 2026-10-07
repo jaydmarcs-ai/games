@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Quiz: Host</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="host">
+<div id="conn" class="conn" hidden>Reconnecting…</div>
+<div id="app"></div>
+<div id="bar"></div>
+<div id="toast" class="toast" hidden></div>
+<script src="/shared.js"></script>
+<script>
+let S = null;
+let KEY = sessionStorage.getItem('quizKey') || '';
+let toastTimer;
+const app = $('#app'), bar = $('#bar');
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
+}
+
+async function act(action, body) {
+  try { await post('/api/admin/' + action, body, { 'x-admin-key': KEY }); }
+  catch (e) { toast(e.message); }
+  poller && poller.refresh();
+}
+
+// ---------- Sign-in ----------
+function gate(msg) {
+  bar.innerHTML = '';
+  app.innerHTML = `<main class="gate">
+    <h1>Host sign-in</h1>
+    <p>Enter the admin PIN you set in Netlify (the ADMIN_PIN variable).</p>
+    <form id="gf">
+      <input id="pin" inputmode="numeric" autocomplete="off" placeholder="Admin PIN" autofocus>
+      <button class="btn go">Open host screen</button>
+    </form>
+    <p class="err">${esc(msg || '')}</p></main>`;
+  $('#gf').onsubmit = async (e) => {
+    e.preventDefault();
+    KEY = $('#pin').value.trim();
+    try { await post('/api/admin/check', {}, { 'x-admin-key': KEY }); sessionStorage.setItem('quizKey', KEY); start(); }
+    catch (err) { gate(err.message); }
+  };
+}
+
+let poller = null;
+function start() {
+  if (poller) return;
+  poller = startPolling({
+    url: (since) => '/api/state' + (since !== null ? `?since=${since}` : ''),
+    onState: (s) => { S = s; render(); },
+    onStatus: showConn,
+  });
+}
+
+// ---------- Views ----------
+function head() {
+  const r = S.round;
+  let mid = '<span></span>';
+  if (r && (S.phase === 'question' || S.phase === 'reveal' || S.phase === 'pick')) {
+    mid = `<span>Round ${r.n} of ${r.of}: ${esc(r.title)}, question ${r.qNum} of ${r.qTotal}</span>`;
+  } else if (S.phase === 'between') {
+    mid = `<span>Round ${S.between.done.n} of ${S.round.of} complete</span>`;
+  }
+  return `<header class="top"><span class="brand">Guess the Quiz</span>${mid}<span>Host: ${esc(S.adminName || '')}</span></header>`;
+}
+
+function lobbyV() {
+  const slots = [];
+  for (let i = 0; i < S.maxTeams; i++) {
+    const t = S.teams[i];
+    slots.push(t
+      ? `<li class="slot on"><span class="nm">${esc(t.name)}<span class="mem">${t.members.map(esc).join(', ')}</span></span><button class="x" data-kick="${t.id}">Remove</button></li>`
+      : '<li class="slot"><span class="nm">Open spot</span></li>');
+  }
+  return `<main class="lobby">
+    <section class="join">
+      <p>Join on your phone</p>
+      <div class="url">${esc(location.host)}</div>
+      <p class="hint">One phone per team. On that phone, enter the team name and up to ${S.teamSize} team members.</p>
+      <p class="hint">${S.totalQuestions} questions in 4 rounds, with a break after round 2.</p>
+    </section>
+    <section>
+      <h2>${S.teams.length} of ${S.maxTeams} teams joined</h2>
+      <ul class="slots">${slots.join('')}</ul>
+    </section></main>`;
+}
+
+function optsHTML(rev) {
+  return `<div class="opts">${S.question.options.map((o, i) =>
+    `<div class="opt ${rev ? (i === rev.correct ? 'win' : 'dim') : ''}" data-i="${i}">
+      <span class="l">${LET[i]}</span><span class="t">${esc(o)}</span>${rev ? `<span class="n">${rev.counts[i]}</span>` : ''}</div>`).join('')}</div>`;
+}
+
+function catLine() {
+  const q = S.question;
+  if (!q.category) return '';
+  return `<p class="catline">${esc(q.category)}${q.chosenBy ? ', picked by ' + esc(q.chosenBy) : ', picked at random'}</p>`;
+}
+
+function questionV() {
+  const done = S.teams.filter((t) => t.answered).length;
+  return `<main class="qv ${S.question.image ? 'hasimg' : ''}">
+    <div class="timer">${meterHTML(S.seconds)}<span id="secs" class="secs"></span></div>
+    ${catLine()}
+    <h1 class="qtext">${esc(S.question.text)}</h1>
+    ${S.question.image ? `<div class="stage">${imgHTML(S.question.image)}${optsHTML(null)}</div>` : optsHTML(null)}
+    <div class="locks"><p>${done} of ${S.teams.length} teams locked in</p>
+      <ul>${S.teams.map((t) => `<li class="${t.answered ? 'on' : ''}">${esc(t.name)}${t.answered ? ': ' + esc(t.by) : ''}</li>`).join('')}</ul></div>
+  </main>`;
+}
+
+function revealV() {
+  const r = S.reveal;
+  const rows = S.teams.map((t) => {
+    const x = r.results[t.id] || {};
+    const gain = x.correct ? '+' + x.gain : x.choice === null ? 'no answer' : '';
+    return `<tr><td class="rk">${t.rank}</td><td>${esc(t.name)}${x.member ? `<span class="by">${esc(x.member)} answered</span>` : ''}</td><td class="gain ${x.correct ? 'up' : ''}">${gain}</td><td class="sc">${t.score}</td></tr>`;
+  }).join('');
+  return `<main class="rv">
+    <section>
+      ${catLine()}
+      <h1 class="qtext">${esc(S.question.text)}</h1>
+      <p class="ans">Correct answer: ${LET[r.correct]}, ${esc(S.question.options[r.correct])}</p>
+      ${S.question.image ? `<div class="revimg">${imgHTML(S.question.image)}</div>` : ''}
+      ${optsHTML(r)}
+    </section>
+    <section><table class="board">${rows}</table></section>
+  </main>`;
+}
+
+function pickV() {
+  const p = S.pick;
+  return `<main class="pickv">
+    <div class="timer">${meterHTML(p.seconds)}<span id="secs" class="secs"></span></div>
+    <h1>${esc(p.chooserName || 'A team')}, choose a category</h1>
+    <p class="sub">Every team will answer the question. Pick on your phone.</p>
+    <div class="cats">${p.categories.map((c) =>
+      `<div class="cat ${c.left ? '' : 'out'}">${esc(c.name)}<small>${c.left ? c.left + ' left' : 'none left'}</small></div>`).join('')}</div>
+  </main>`;
+}
+
+function betweenV() {
+  const b = S.between;
+  const rows = S.teams.map((t) =>
+    `<tr><td class="rk">${t.rank}</td><td>${esc(t.name)}</td><td class="gain up">${t.roundGain ? '+' + t.roundGain : ''}</td><td class="sc">${t.score}</td></tr>`).join('');
+  return `<main class="btw">
+    ${b.breakEndsAt ? `<div><p class="sub">Break: back in</p><div class="brk" id="brk"></div><p class="sub" id="brknote"></p></div>` : `<h1>Round ${b.done.n} complete</h1>`}
+    <div class="next"><b>Next: Round ${b.next.n}, ${esc(b.next.title)}</b><p>${esc(b.next.blurb)}</p></div>
+    <table class="board">${rows}</table>
+  </main>`;
+}
+
+function finalV() {
+  const f = S.final;
+  const w = S.teams.filter((t) => f.winners.includes(t.id));
+  let title, sub = '';
+  if (!w.length) title = 'No points were scored';
+  else if (w.length === 1) title = `Congratulations ${esc(w[0].name)}! You are the champions!`;
+  else title = `Congratulations ${w.map((t) => esc(t.name)).join(' and ')}! It's a tie, so you are all champions!`;
+  if (f.tiebreak === 'speed') sub = 'Level on points. The title goes to the team with the faster correct answers.';
+  const rows = S.teams.map((t) =>
+    `<tr><td class="rk">${t.rank}</td><td>${esc(t.name)}</td><td class="sc">${t.score}</td></tr>`).join('');
+  return `<main class="fin"><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}<table class="board">${rows}</table></main>`;
+}
+
+function barV() {
+  const b = [];
+  const n = S.teams.length;
+  const ph = S.phase;
+  if (ph === 'lobby') {
+    b.push(`<button class="btn go" data-act="start" ${n ? '' : 'disabled'}>${n ? `Start game with ${n} team${n === 1 ? '' : 's'}` : 'Waiting for the first team'}</button>`);
+  } else if (ph === 'question') {
+    b.push('<button class="btn go" data-act="close">Close question now</button>');
+  } else if (ph === 'reveal') {
+    const r = S.reveal;
+    b.push(`<button class="btn go" data-act="next">${r.lastInGame ? 'Show final results' : r.lastInRound ? `Finish round ${S.round.n}` : 'Next question'}</button>`);
+  } else if (ph === 'pick') {
+    b.push(`<span class="barlabel">Pick for ${esc(S.pick.chooserName || 'the team')}:</span>`);
+    S.pick.categories.filter((c) => c.left).forEach((c) =>
+      b.push(`<button class="btn go" data-pick="${esc(c.id)}">${esc(c.name)}</button>`));
+  } else if (ph === 'between') {
+    b.push(`<button class="btn go" data-act="startround">Start round ${S.between.next.n}</button>`);
+    if (S.between.breakEndsAt) b.push('<button class="btn ghost" data-act="addbreak">Add 5 minutes</button>');
+  } else {
+    b.push('<button class="btn go" data-act="again">Play again with the same teams</button>');
+    b.push('<button class="btn ghost" data-act="clear">Clear teams and start over</button>');
+  }
+  if (['question', 'reveal', 'pick', 'between'].includes(ph)) b.push('<button class="btn ghost" data-act="end">End game</button>');
+  return b.join('');
+}
+
+const ACTIONS = {
+  start: () => act('start'),
+  close: () => act('close'),
+  next: () => act('next'),
+  startround: () => {
+    const left = S.between.breakEndsAt - serverNow();
+    if (S.between.breakEndsAt && left > 0 && !confirm(`The break still has ${fmtClock(left)} left. Start round ${S.between.next.n} now?`)) return;
+    act('startround');
+  },
+  addbreak: () => act('addbreak', { minutes: 5 }),
+  end: () => { if (confirm('End the game now and show the final results?')) act('end'); },
+  again: () => act('reset', { keepTeams: true }),
+  clear: () => { if (confirm('Remove all teams and go back to the lobby?')) act('reset', { keepTeams: false }); },
+};
+
+function render() {
+  if (!S) return;
+  const view = { lobby: lobbyV, question: questionV, reveal: revealV, pick: pickV, between: betweenV, final: finalV }[S.phase];
+  app.innerHTML = head() + view();
+  bar.innerHTML = barV();
+  bar.querySelectorAll('[data-act]').forEach((el) => { el.onclick = ACTIONS[el.dataset.act]; });
+  bar.querySelectorAll('[data-pick]').forEach((el) => { el.onclick = () => act('pick', { category: el.dataset.pick }); });
+  app.querySelectorAll('[data-kick]').forEach((el) => {
+    el.onclick = () => { if (confirm('Remove this team?')) act('kick', { teamId: el.dataset.kick }); };
+  });
+  if (S.between) preload(S.between.preload);
+  tickAll(S);
+}
+
+setInterval(() => tickAll(S), 100);
+
+// Check the saved PIN first (it may have been changed in Netlify).
+if (KEY) post('/api/admin/check', {}, { 'x-admin-key': KEY }).then(start).catch(() => { KEY = ''; sessionStorage.removeItem('quizKey'); gate(); });
+else gate();
+</script>
+</body>
+</html>

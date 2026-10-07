@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+<rect width="400" height="400" fill="#efeaff"/>
+<rect x="12" y="12" width="376" height="376" rx="18" fill="none" stroke="#8b7bff" stroke-width="4" stroke-dasharray="14 10"/>
+<text x="200.0" y="200.0" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="80" fill="#3a2f63">Face 17</text>
+<text x="200.0" y="234.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#5b5473">placeholder: replace with img/faces/17.png</text>
+</svg>
