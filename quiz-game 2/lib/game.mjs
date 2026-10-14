@@ -97,6 +97,25 @@ export function newGame(teams = {}) {
   };
 }
 
+// The game state is saved between requests, and it can outlive a redeploy. State that an
+// older version saved may be missing fields this version needs, so fill them in on load.
+export function normalize(g) {
+  const fresh = newGame();
+  for (const k of Object.keys(fresh)) if (g[k] === undefined) g[k] = fresh[k];
+  for (const t of Object.values(g.teams)) {
+    if (!Array.isArray(t.members)) t.members = [];
+    if (!Array.isArray(t.turns) || t.turns.length !== t.members.length) t.turns = t.members.map(() => 0);
+    for (const k of ['score', 'base', 'correct', 'totalMs']) if (typeof t[k] !== 'number') t[k] = 0;
+    if (t.answer === undefined) t.answer = null;
+  }
+  // Saved mid-question by a version that stored questions differently: restart from the lobby.
+  if ((g.phase === 'question' || g.phase === 'reveal') && !g.cur) {
+    g.phase = 'lobby'; g.round = -1; g.reveal = null; g.pick = null; g.between = null;
+    for (const t of Object.values(g.teams)) { t.score = 0; t.base = 0; t.correct = 0; t.totalMs = 0; t.answer = null; }
+  }
+  return g;
+}
+
 const teamList = (g) => Object.values(g.teams);
 const cleanName = (n) => String(n || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
 const findByName = (g, name) => teamList(g).find((t) => t.name.toLowerCase() === name.toLowerCase());

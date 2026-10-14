@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { HttpError, newGame, tick, view, join, leave, answer, pickByTeam, admin } from './game.mjs';
+import { HttpError, newGame, normalize, tick, view, join, leave, answer, pickByTeam, admin } from './game.mjs';
 
 const HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 const json = (status, obj) => new Response(JSON.stringify(obj), { status, headers: HEADERS });
@@ -21,7 +21,7 @@ export function makeHandler(store, opts) {
   async function mutate(fn) {
     for (let attempt = 0; attempt < 6; attempt++) {
       const cur = await store.load();
-      const g = cur ? cur.data : newGame();
+      const g = normalize(cur ? cur.data : newGame());
       const t = now();
       tick(g, t);
       const out = fn(g, t);
@@ -34,7 +34,7 @@ export function makeHandler(store, opts) {
 
   async function readState(url) {
     const cur = await store.load();
-    let g = cur ? cur.data : newGame();
+    let g = normalize(cur ? cur.data : newGame());
     let t = now();
     if (tick(structuredClone(g), t)) ({ g, t } = await mutate(() => {})); // time ran out: close the round
     const who = { teamId: url.searchParams.get('teamId'), deviceId: url.searchParams.get('deviceId') };
