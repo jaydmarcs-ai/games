@@ -64,8 +64,12 @@ function start() {
 function head() {
   const r = S.round;
   let mid = '<span></span>';
-  if (r && (S.phase === 'question' || S.phase === 'reveal' || S.phase === 'pick')) {
-    mid = `<span>Round ${r.n} of ${r.of}: ${esc(r.title)}, question ${r.qNum} of ${r.qTotal}</span>`;
+  if (r && S.phase === 'pick' && S.pick.kind === 'claim') {
+    mid = `<span>Round ${r.n} of ${r.of}: ${esc(r.title)}, team ${S.pick.turnNo} of ${S.pick.turnTotal}</span>`;
+  } else if (r && (S.phase === 'question' || S.phase === 'reveal' || S.phase === 'pick')) {
+    mid = r.kind === 'claim'
+      ? `<span>Round ${r.n} of ${r.of}: ${esc(r.title)}, team ${r.turnNo} of ${r.turnTotal}, question ${r.qNum} of ${r.qTotal}</span>`
+      : `<span>Round ${r.n} of ${r.of}: ${esc(r.title)}, question ${r.qNum} of ${r.qTotal}</span>`;
   } else if (S.phase === 'between') {
     mid = `<span>Round ${S.between.done.n} of ${S.round.of} complete</span>`;
   }
@@ -86,6 +90,9 @@ function lobbyV() {
       <div class="url">${esc(location.host)}</div>
       <p class="hint">One phone per team. On that phone, enter the team name and up to ${S.teamSize} team members.</p>
       <p class="hint">${S.totalQuestions} questions in 4 rounds, with a break after round 2.</p>
+      ${S.liveAnswer && S.liveAnswer.length ? `<div class="notice"><b>${S.liveAnswer.length} typed-number question${S.liveAnswer.length === 1 ? ' has' : 's have'} no saved answer:</b>
+        <ul>${S.liveAnswer.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+        <p>Teams will type their answers. When one of these closes, you type the correct number and the points are awarded. (To skip that step, put the number in questions/quiz.json instead of <code>"answer": null</code>.)</p></div>` : ''}
     </section>
     <section>
       <h2>${S.teams.length} of ${S.maxTeams} teams joined</h2>
@@ -94,6 +101,7 @@ function lobbyV() {
 }
 
 function optsHTML(rev) {
+  if (S.question.type === 'number') return rev ? '' : '<div class="numhint">Type your answer on your phone' + (S.question.liveAnswer ? '<small>The correct number is confirmed once the question closes.</small>' : '') + '</div>';
   return `<div class="opts">${S.question.options.map((o, i) =>
     `<div class="opt ${rev ? (i === rev.correct ? 'win' : 'dim') : ''}" data-i="${i}">
       <span class="l">${LET[i]}</span><span class="t">${esc(o)}</span>${rev ? `<span class="n">${rev.counts[i]}</span>` : ''}</div>`).join('')}</div>`;
@@ -102,18 +110,21 @@ function optsHTML(rev) {
 function catLine() {
   const q = S.question;
   if (!q.category) return '';
+  if (q.owner) return `<p class="catline">${esc(q.category)}: ${esc(q.owner.name)}'s category, only they can answer</p>`;
   return `<p class="catline">${esc(q.category)}${q.chosenBy ? ', picked by ' + esc(q.chosenBy) : ', picked at random'}</p>`;
 }
 
 function questionV() {
-  const done = S.teams.filter((t) => t.answered).length;
+  const own = S.question.owner;
+  const who = own ? S.teams.filter((t) => t.id === own.id) : S.teams;
+  const done = who.filter((t) => t.answered).length;
   return `<main class="qv ${S.question.image ? 'hasimg' : ''}">
     <div class="timer">${meterHTML(S.seconds)}<span id="secs" class="secs"></span></div>
     ${catLine()}
     <h1 class="qtext">${esc(S.question.text)}</h1>
-    ${S.question.image ? `<div class="stage">${imgHTML(S.question.image)}${optsHTML(null)}</div>` : optsHTML(null)}
-    <div class="locks"><p>${done} of ${S.teams.length} teams locked in</p>
-      <ul>${S.teams.map((t) => `<li class="${t.answered ? 'on' : ''}">${esc(t.name)}${t.answered ? ': ' + esc(t.by) : ''}</li>`).join('')}</ul></div>
+    ${S.question.image ? `<div class="stage">${imgHTML(S.question.image, S.question.crop, 0.46)}${optsHTML(null)}</div>` : optsHTML(null)}
+    <div class="locks"><p>${own ? (done ? esc(own.name) + ' has locked in. Everyone else, watch the screen.' : esc(own.name) + ' is answering. Everyone else, watch the screen.') : done + ' of ' + who.length + ' teams locked in'}</p>
+      <ul>${who.map((t) => `<li class="${t.answered ? 'on' : ''}">${esc(t.name)}${t.answered ? ': ' + esc(t.by) : ''}</li>`).join('')}</ul></div>
   </main>`;
 }
 
@@ -121,29 +132,37 @@ function revealV() {
   const r = S.reveal;
   const rows = S.teams.map((t) => {
     const x = r.results[t.id] || {};
-    const gain = x.correct ? '+' + x.gain : x.choice === null ? 'no answer' : '';
-    return `<tr><td class="rk">${t.rank}</td><td>${esc(t.name)}${x.member ? `<span class="by">${esc(x.member)} answered</span>` : ''}</td><td class="gain ${x.correct ? 'up' : ''}">${gain}</td><td class="sc">${t.score}</td></tr>`;
+    const gain = x.correct ? '+' + x.gain : x.watching ? '' : x.choice === null && x.value === null ? 'no answer' : '';
+    return `<tr><td class="rk">${t.rank}</td><td>${esc(t.name)}${x.member ? `<span class="by">${esc(x.member)} answered${x.value !== null && x.value !== undefined ? ' ' + esc(x.value) : ''}</span>` : ''}</td><td class="gain ${x.correct ? 'up' : ''}">${gain}</td><td class="sc">${t.score}</td></tr>`;
   }).join('');
   return `<main class="rv">
     <section>
       ${catLine()}
       <h1 class="qtext">${esc(S.question.text)}</h1>
-      <p class="ans">Correct answer: ${LET[r.correct]}, ${esc(S.question.options[r.correct])}</p>
-      ${S.question.image ? `<div class="revimg">${imgHTML(S.question.image)}</div>` : ''}
+      ${r.type === 'number'
+        ? (r.pending
+          ? `<p class="ans">What is the correct number?</p><div class="bignum">?</div><p class="sub">Each team's typed answer is on the right. Enter the correct number in the bar below.</p>`
+          : r.skipped
+            ? `<p class="ans">No points for this question</p>`
+            : `<p class="ans">Correct answer${r.tolerance ? ` (within ${r.tolerance} counts)` : ''}</p><div class="bignum">${esc(r.answerValue)}</div>`)
+        : `<p class="ans">Correct answer: ${LET[r.correct]}, ${esc(S.question.options[r.correct])}</p>`}
+      ${S.question.image && !S.question.crop ? `<div class="revimg">${imgHTML(S.question.image)}</div>` : ''}
       ${optsHTML(r)}
     </section>
-    <section><table class="board">${rows}</table></section>
+    <section>${S.question.crop ? `<div class="revbig">${imgHTML(S.question.image)}</div>` : ''}<table class="board">${rows}</table></section>
   </main>`;
 }
 
 function pickV() {
   const p = S.pick;
+  const claim = p.kind === 'claim';
   return `<main class="pickv">
     <div class="timer">${meterHTML(p.seconds)}<span id="secs" class="secs"></span></div>
-    <h1>${esc(p.chooserName || 'A team')}, choose a category</h1>
-    <p class="sub">Every team will answer the question. Pick on your phone.</p>
+    ${claim ? '<p class="drawn">Drawn at random</p>' : ''}
+    <h1>${esc(p.chooserName || 'A team')}, ${claim ? 'choose your category' : 'choose a category'}</h1>
+    <p class="sub">${claim ? 'You will play it alone, and no other team can choose it. Pick on your phone.' : 'Every team will answer the question. Pick on your phone.'}</p>
     <div class="cats">${p.categories.map((c) =>
-      `<div class="cat ${c.left ? '' : 'out'}">${esc(c.name)}<small>${c.left ? c.left + ' left' : 'none left'}</small></div>`).join('')}</div>
+      `<div class="cat ${c.left ? '' : 'out'}">${esc(c.name)}<small>${claim ? (c.owner ? 'Taken by ' + esc(c.owner) : c.left + ' questions') : (c.left ? c.left + ' left' : 'none left')}</small></div>`).join('')}</div>
   </main>`;
 }
 
@@ -181,7 +200,12 @@ function barV() {
     b.push('<button class="btn go" data-act="close">Close question now</button>');
   } else if (ph === 'reveal') {
     const r = S.reveal;
-    b.push(`<button class="btn go" data-act="next">${r.lastInGame ? 'Show final results' : r.lastInRound ? `Finish round ${S.round.n}` : 'Next question'}</button>`);
+    if (r.pending) {
+      b.push('<input id="ansnum" class="ansnum" inputmode="decimal" autocomplete="off" placeholder="Correct number">');
+      b.push('<button class="btn go" data-act="setanswer">Confirm answer</button>');
+      b.push('<button class="btn ghost" data-act="skipanswer">No points for this one</button>');
+    } else
+    b.push(`<button class="btn go" data-act="next">${r.lastInGame ? 'Show final results' : r.lastInRound ? `Finish round ${S.round.n}` : r.nextTeam ? 'Draw the next team' : 'Next question'}</button>`);
   } else if (ph === 'pick') {
     b.push(`<span class="barlabel">Pick for ${esc(S.pick.chooserName || 'the team')}:</span>`);
     S.pick.categories.filter((c) => c.left).forEach((c) =>
@@ -201,6 +225,8 @@ const ACTIONS = {
   start: () => act('start'),
   close: () => act('close'),
   next: () => act('next'),
+  setanswer: () => act('setanswer', { value: $('#ansnum') ? $('#ansnum').value : '' }),
+  skipanswer: () => { if (confirm('Give no points for this question?')) act('skipanswer'); },
   startround: () => {
     const left = S.between.breakEndsAt - serverNow();
     if (S.between.breakEndsAt && left > 0 && !confirm(`The break still has ${fmtClock(left)} left. Start round ${S.between.next.n} now?`)) return;
@@ -216,7 +242,13 @@ function render() {
   if (!S) return;
   const view = { lobby: lobbyV, question: questionV, reveal: revealV, pick: pickV, between: betweenV, final: finalV }[S.phase];
   app.innerHTML = head() + view();
+  const typing = $('#ansnum') ? { v: $('#ansnum').value, f: document.activeElement === $('#ansnum') } : null;
   bar.innerHTML = barV();
+  const box = $('#ansnum');
+  if (box) {
+    if (typing) { box.value = typing.v; if (typing.f) box.focus(); }
+    box.onkeydown = (e) => { if (e.key === 'Enter') ACTIONS.setanswer(); };
+  }
   bar.querySelectorAll('[data-act]').forEach((el) => { el.onclick = ACTIONS[el.dataset.act]; });
   bar.querySelectorAll('[data-pick]').forEach((el) => { el.onclick = () => act('pick', { category: el.dataset.pick }); });
   app.querySelectorAll('[data-kick]').forEach((el) => {
@@ -224,6 +256,7 @@ function render() {
   });
   if (S.between) preload(S.between.preload);
   tickAll(S);
+  fixCrops();
 }
 
 setInterval(() => tickAll(S), 100);

@@ -35,7 +35,7 @@ const poller = startPolling({
   onState: (s) => {
     S = s;
     if (!s.me && teamId) { teamId = ''; localStorage.removeItem('quizTeam'); } // removed by the host
-    const qKey = s.round ? s.round.n + ':' + s.round.qNum + ':' + s.phase : 'none';
+    const qKey = s.round ? s.round.n + ':' + s.round.turnNo + ':' + s.round.qNum + ':' + s.phase : 'none';
     if (s.phase === 'question' || s.phase === 'pick') { if (qKey !== lastIndex) { lastIndex = qKey; pending = null; selMember = null; } }
     render();
   },
@@ -71,6 +71,17 @@ async function pick(i) {
   navigator.vibrate && navigator.vibrate(30);
   render();
   try { await post('/api/answer', { teamId, deviceId: dev, choice: i, member: pending.member }); poller.refresh(); }
+  catch (e) { pending = null; toast(e.message); render(); }
+}
+
+async function submitNumber() {
+  if (pending !== null || S.me.answer !== null) return;
+  const raw = ($('#num') ? $('#num').value : '').trim();
+  if (raw === '' || Number.isNaN(Number(raw.replace(/[\s,]/g, '')))) { toast('Type a number first.'); return; }
+  pending = { choice: null, value: raw, member: chosenMember() };
+  navigator.vibrate && navigator.vibrate(30);
+  render();
+  try { await post('/api/answer', { teamId, deviceId: dev, value: raw, member: pending.member }); poller.refresh(); }
   catch (e) { pending = null; toast(e.message); render(); }
 }
 
@@ -111,58 +122,83 @@ function lobbyV() {
   </main>`;
 }
 
+function watchV() {
+  const q = S.question, m = S.me;
+  return `<main class="p">
+    <div class="timer">${meterHTML(S.seconds)}<span id="secs" class="secs"></span></div>
+    <p class="catline">${esc(q.category)}</p>
+    <h1>${esc(q.owner.name)} is answering</h1>
+    <p class="note">This is ${esc(q.owner.name)}'s turn, so only they can answer. Watch the screen. Your turn comes when your team is drawn.</p>
+    <p class="stat">${esc(m.name)}: rank ${m.rank} of ${S.teams.length}, ${m.score} points.</p>
+  </main>`;
+}
+
 function questionV() {
   const m = S.me;
+  if (S.question.owner && S.question.owner.id !== m.id) return watchV();
   const locked = m.answer !== null || pending !== null;
-  const a = m.answer || pending;                 // { choice, member }
+  const a = m.answer || pending;                 // { choice, value, member }
   const sel = locked ? a.member : chosenMember();
+  const isNum = S.question.type === 'number';
   return `<main class="p ${S.question.image ? 'hasimg' : ''}">
     <div class="timer">${meterHTML(S.seconds)}<span id="secs" class="secs"></span></div>
     <p class="stat">${esc(m.name)}, round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}</p>
-    ${S.question.category ? `<p class="catline">${esc(S.question.category)}${S.question.chosenBy ? ', picked by ' + esc(S.question.chosenBy) : ', picked at random'}</p>` : ''}
+    ${S.question.category ? `<p class="catline">${esc(S.question.category)}${S.question.owner ? ', your category' : S.question.chosenBy ? ', picked by ' + esc(S.question.chosenBy) : ', picked at random'}</p>` : ''}
     <h1 class="qtext">${esc(S.question.text)}</h1>
-    ${S.question.image ? imgHTML(S.question.image) : ''}
+    ${S.question.image ? imgHTML(S.question.image, S.question.crop, 0.26) : ''}
     <div class="who"><p>${locked ? 'Answering' : 'Who is answering?'}</p>
       <div class="chips" role="group" aria-label="Who is answering">${m.members.map((name, i) =>
         `<button class="chip" data-m="${i}" aria-pressed="${sel === i}" ${locked ? 'disabled' : ''}>${esc(name)}${m.turns[i] ? `<span class="ct">${m.turns[i]}x</span>` : ''}</button>`).join('')}</div></div>
-    <div class="opts">${S.question.options.map((o, i) =>
-      `<button class="opt ${locked && a.choice === i ? 'mine' : ''}" data-i="${i}" ${locked ? 'disabled' : ''}><span class="l">${LET[i]}</span><span class="t">${esc(o)}</span></button>`).join('')}</div>
-    <p class="status">${locked ? `Locked in: ${LET[a.choice]}, answered by ${esc(m.members[a.member])}. Waiting for the other teams.` : 'Pick who answers, then tap an answer.'}</p>
+    ${isNum
+      ? `<div class="numrow"><input class="numin" id="num" inputmode="decimal" autocomplete="off" placeholder="Type the number" ${locked ? `disabled value="${esc(a.value)}"` : ''}>
+          <button class="btn big" id="lock" ${locked ? 'disabled' : ''}>Lock in answer</button></div>`
+      : `<div class="opts">${S.question.options.map((o, i) =>
+          `<button class="opt ${locked && a.choice === i ? 'mine' : ''}" data-i="${i}" ${locked ? 'disabled' : ''}><span class="l">${LET[i]}</span><span class="t">${esc(o)}</span></button>`).join('')}</div>`}
+    <p class="status">${locked ? `Locked in: ${isNum ? esc(a.value) : LET[a.choice]}, answered by ${esc(m.members[a.member])}.${S.question.owner ? '' : ' Waiting for the other teams.'}` : isNum ? 'Pick who answers, type the number, then lock it in.' : 'Pick who answers, then tap an answer.'}</p>
   </main>`;
 }
 
 function revealV() {
   const m = S.me, r = m.result, q = S.question, rv = S.reveal;
   let head;
-  if (r.correct) head = `<p class="big-result good">Correct! +${r.gain}</p>`;
-  else if (r.choice === null) head = '<p class="big-result bad">No answer in time</p>';
+  if (r.watching) head = `<p class="big-result">Not your question</p>`;
+  else if (rv.pending) head = `<p class="big-result">Answer coming up</p>`;
+  else if (rv.skipped) head = `<p class="big-result">No points this time</p>`;
+  else if (r.correct) head = `<p class="big-result good">Correct! +${r.gain}</p>`;
+  else if (r.choice === null && (r.value === null || r.value === undefined)) head = '<p class="big-result bad">No answer in time</p>';
   else head = '<p class="big-result bad">Not this time</p>';
   return `<main class="p">
     ${head}
-    <p class="status">The answer was ${LET[rv.correct]}, ${esc(q.options[rv.correct])}.</p>
+    <p class="status">${rv.pending ? `Waiting for ${esc(S.adminName)} to confirm the correct number.` : rv.skipped ? 'This question was not scored.' : rv.type === 'number' ? `The answer was ${esc(rv.answerValue)}.` : `The answer was ${LET[rv.correct]}, ${esc(q.options[rv.correct])}.`}</p>
+    ${rv.type === 'number' && r.value !== null && r.value !== undefined ? `<p class="stat">Your team typed ${esc(r.value)}.</p>` : ''}
     ${r.member ? `<p class="stat">${esc(r.member)} answered for ${esc(m.name)}.</p>` : ''}
     <p class="stat">${esc(m.name)}: rank ${m.rank} of ${S.teams.length}, ${m.score} points.</p>
-    <p class="note">${rv.isLast ? `Waiting for ${esc(S.adminName)} to show the final results.` : 'Next question coming up.'}</p>
+    <p class="note">${rv.lastInGame ? `Waiting for ${esc(S.adminName)} to show the final results.` : rv.lastInRound ? `Round complete. Waiting for ${esc(S.adminName)}.` : 'Next question coming up.'}</p>
   </main>`;
 }
 
 function pickV() {
   const m = S.me, p = S.pick;
+  const claim = p.kind === 'claim';
+  const roundLine = claim ? `Round ${S.round.n}: ${esc(S.round.title)}, team ${p.turnNo} of ${p.turnTotal}` : `Round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}`;
+  const label = (c) => (claim ? (c.owner ? 'Taken by ' + esc(c.owner) : c.left + ' questions') : (c.left ? c.left + ' left' : 'none left'));
   if (m.isChooser) {
     return `<main class="p">
       <div class="timer">${meterHTML(p.seconds)}<span id="secs" class="secs"></span></div>
-      <p class="roundline">Round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}</p>
-      <h1>Your turn to choose</h1>
-      <p class="note">Pick a category. Every team answers the question.</p>
+      <p class="roundline">${roundLine}</p>
+      <h1>${claim ? 'You were drawn! Choose your category' : 'Your turn to choose'}</h1>
+      <p class="note">${claim ? 'Your team plays it alone, starting as soon as you pick, and no other team can choose it.' : 'Pick a category. Every team answers the question.'}</p>
       <div class="cats">${p.categories.map((c) =>
-        `<button class="cat" data-cat="${esc(c.id)}" ${c.left ? '' : 'disabled'}>${esc(c.name)}<small>${c.left ? c.left + ' left' : 'none left'}</small></button>`).join('')}</div>
+        `<button class="cat" data-cat="${esc(c.id)}" ${c.left ? '' : 'disabled'}>${esc(c.name)}<small>${label(c)}</small></button>`).join('')}</div>
     </main>`;
   }
+  const mine = claim ? p.categories.find((c) => c.owner === m.name) : null;
   return `<main class="p">
     <div class="timer">${meterHTML(p.seconds)}<span id="secs" class="secs"></span></div>
-    <p class="roundline">Round ${S.round.n}, question ${S.round.qNum} of ${S.round.qTotal}</p>
-    <h1>${esc(p.chooserName || 'A team')} is choosing the category</h1>
-    <p class="note">Get ready. Everyone answers the next question.</p>
+    <p class="roundline">${roundLine}</p>
+    <h1>${esc(p.chooserName || 'A team')} ${claim ? 'was drawn to choose a category' : 'is choosing the category'}</h1>
+    ${mine ? `<p class="status">You claimed ${esc(mine.name)}.</p>` : ''}
+    <p class="note">${claim ? 'Every team gets one turn, drawn at random. Watch the screen.' : 'Get ready. Everyone answers the next question.'}</p>
   </main>`;
 }
 
@@ -220,10 +256,15 @@ function render() {
   app.querySelectorAll('.chip').forEach((el) => { el.onclick = () => { selMember = Number(el.dataset.m); render(); }; });
   app.querySelectorAll('.opt').forEach((el) => { el.onclick = () => pick(Number(el.dataset.i)); });
   app.querySelectorAll('[data-cat]').forEach((el) => { el.onclick = () => pickCat(el.dataset.cat); });
+  const lk = $('#lock');
+  if (lk) lk.onclick = submitNumber;
+  const nm = $('#num');
+  if (nm) nm.onkeydown = (e) => { if (e.key === 'Enter') submitNumber(); };
   const lv = $('#leave');
   if (lv) lv.onclick = leave;
   if (S.between) preload(S.between.preload); // download the next round's images during the break
   tickAll(S);
+  fixCrops();
 }
 
 setInterval(() => tickAll(S), 100);

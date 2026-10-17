@@ -1,6 +1,6 @@
 // Run with: npm test   (no Netlify account or network needed)
 import { makeHandler } from '../lib/handler.mjs';
-import { ROUNDS, TOTAL_QUESTIONS } from '../lib/game.mjs';
+import { ROUNDS, TOTAL_QUESTIONS, CROP_PRESETS } from '../lib/game.mjs';
 
 // In-memory stand-in for Netlify Blobs, with the same etag behaviour.
 let blob = null, etagN = 0;
@@ -89,55 +89,96 @@ check('round gains are shown', s.teams.every((t) => t.roundGain === t.score));
 check('cannot add break time when there is no break', (await adm('addbreak', { minutes: 5 })).status === 409);
 check('no question can be answered between rounds', (await ans(teams[0], 0)).status === 409);
 
-// ---- Round 2: teams choose the category ----
+// ---- Round 2: a random team is drawn, claims a category, plays it alone, then the next team ----
+const ROUND2 = ROUNDS[1];
+const findQ = (text) => {
+  for (const c of ROUND2.categories) { const q = c.questions.find((x) => x.text === text); if (q) return q; }
+  throw new Error('question not found: ' + text);
+};
+// The right answer to a question, whether it is multiple choice or a typed number.
+// Typed questions with no saved answer get the number 5, and the host later confirms 5 (see settle).
+const rightAnswer = (text) => { const q = findQ(text); return q.type === 'number' ? { value: q.answer ?? 5 } : { choice: q.correct }; };
+const wrongAnswer = (text) => { const q = findQ(text); return q.type === 'number' ? { value: (q.answer ?? 5) + 1 } : { choice: (q.correct + 1) % q.options.length }; };
+const settle = async () => { const st = await S(); if (st.reveal && st.reveal.pending) await adm('setanswer', { value: 5 }); };
+const play = (team, a) => post('answer', { teamId: team.teamId, deviceId: team.dev, member: 0, ...a });
+const teamNamed = (n) => teams.find((t) => t.teamId === (s.teams.find((x) => x.name === n) || {}).id);
+
 check('host starts round 2', (await adm('startround')).status === 200);
 s = await S();
-check('round 2 opens on a category pick', s.phase === 'pick' && s.round.kind === 'pick' && s.round.qTotal === 32 && s.pick.categories.length === 4);
-check('categories are Sports, History, CRE, Entertainment, 8 questions each',
-  s.pick.categories.map((c) => c.name).join() === 'Sports,History,CRE,Entertainment' && s.pick.categories.every((c) => c.left === 8));
+check('round 2 opens with a team drawn to choose a category (8 categories)',
+  s.phase === 'pick' && s.pick.kind === 'claim' && s.pick.drawn === true && s.pick.categories.length === 8 && s.pick.turnNo === 1 && s.pick.turnTotal === 3);
+check('categories include Sports, History, JW and Entertainment (no CRE)',
+  ['Sports', 'History', 'JW', 'Entertainment'].every((n) => s.pick.categories.some((c) => c.name === n)) && !s.pick.categories.some((c) => c.name === 'CRE'));
 
-const choosers = [];
-const catsSeen = {};
-for (let i = 0; i < 32; i++) {
+const drawn = [];                      // the order teams were drawn in
+const played = {};                     // team name -> category it played
+let jwTeam = null;
+for (let turn = 1; turn <= 3; turn++) {
   s = await S();
-  if (s.phase !== 'pick') { check(`pick phase before question ${i + 1}`, false, s.phase); break; }
-  choosers.push(s.pick.chooserName);
   const chooser = teams.find((t) => t.teamId === s.pick.chooserId);
-  const other = teams.find((t) => t.teamId !== s.pick.chooserId);
-  if (i === 0) {
-    check('a team whose turn it is not cannot pick',
-      (await post('pick', { teamId: other.teamId, deviceId: other.dev, category: 'sports' })).status === 403);
-    const me = (await state(`?teamId=${chooser.teamId}&deviceId=${chooser.dev}`)).body.me;
-    check('the choosing team is told it is its turn', me.isChooser === true);
+  const name = s.pick.chooserName;
+  drawn.push(name);
+  if (turn === 1) {
+    const notDrawn = teams.find((t) => t !== chooser);
+    check('a team that was not drawn cannot choose', (await post('pick', { teamId: notDrawn.teamId, deviceId: notDrawn.dev, category: 'sports' })).status === 403);
+    check('it is turn 1 of 3', s.pick.turnNo === 1 && s.pick.turnTotal === 3);
   }
-  if (i === 9) {
-    const full = s.pick.categories.find((c) => c.id === 'sports');
-    check('a used-up category cannot be chosen',
-      full.left === 0 && (await post('pick', { teamId: chooser.teamId, deviceId: chooser.dev, category: 'sports' })).status === 409);
+  const free = s.pick.categories.filter((c) => c.left > 0);
+  // First team takes JW so the typed-number path is exercised; later teams take whatever is free
+  const want = turn === 1 ? 'jw' : free[0].id;
+  if (turn === 2) {
+    const takenId = Object.keys(played).length ? s.pick.categories.find((c) => c.owner) : null;
+    check('the category that was just played shows as taken, so nobody else can choose it', !!takenId && takenId.left === 0 && takenId.owner === drawn[0]);
+    check('a taken category cannot be chosen again', (await post('pick', { teamId: chooser.teamId, deviceId: chooser.dev, category: takenId.id })).status === 409);
   }
-  if (i === 10) {
-    clock += 20_000; // nobody picks: a random category is chosen
-    s = await S();
-    check('if the team does not choose in time, a category is chosen at random',
-      s.phase === 'question' && !!s.question.category && s.question.chosenBy === null);
-  } else if (i === 11) {
-    const left = s.pick.categories.find((c) => c.left > 0).id;
-    check('host can choose for the team', (await adm('pick', { category: left })).status === 200);
-  } else {
-    const cat = i < 8 ? 'sports' : s.pick.categories.find((c) => c.left > 0).id; // first 8 picks use up Sports
-    const r = await post('pick', { teamId: chooser.teamId, deviceId: chooser.dev, category: cat });
-    if (r.status !== 200) { check(`pick ${i + 1}`, false, JSON.stringify(r.body)); break; }
-  }
+  const r = await post('pick', { teamId: chooser.teamId, deviceId: chooser.dev, category: want });
+  check(`turn ${turn}: ${name} chooses and starts playing straight away`, r.status === 200 && (await S()).phase === 'question', JSON.stringify(r));
   s = await S();
-  seen++;
-  catsSeen[s.question.category] = (catsSeen[s.question.category] || 0) + 1;
-  if (i === 0) check('the question shows its category and which team chose it', s.question.category === 'Sports' && s.question.chosenBy === chooser.name);
-  clock += 1000; await allAnswer([0, 1, 2]);
-  if (i < 31) await adm('next');
+  played[name] = s.question.category;
+  if (turn === 1) jwTeam = name;
+  check(`turn ${turn}: the question belongs to ${name}, shown as question 1 of 4`, s.question.owner.name === name && s.round.qNum === 1 && s.round.qTotal === 4);
+
+  const texts = new Set();
+  for (let i = 0; i < 4; i++) {
+    s = await S();
+    seen++;
+    texts.add(s.question.text);
+    if (s.question.owner.name !== name || s.question.category !== played[name]) { check(`${name}'s block stays on its own category`, false, s.question.owner.name); break; }
+    if (turn === 1 && i === 0) {
+      const others = teams.filter((t) => t !== chooser);
+      const x = await play(others[0], { choice: 0 }), y = await play(others[1], { choice: 0 });
+      check('other teams cannot answer while a team plays its category', x.status === 403 && y.status === 403);
+      clock += 1000;
+      const before = (await S()).teams.map((t) => t.score).join();
+      await play(chooser, rightAnswer(s.question.text));
+      s = await S();
+      check('it closes as soon as the team that is playing has answered', s.phase === 'reveal');
+      await settle();
+      s = await S();
+      check('only that team scores; the others are marked as watching',
+        s.reveal.results[chooser.teamId].correct && others.every((o) => s.reveal.results[o.teamId].watching && s.reveal.results[o.teamId].gain === 0) &&
+        before !== s.teams.map((t) => t.score).join());
+    } else {
+      clock += 1500;
+      await play(chooser, i % 2 ? rightAnswer(s.question.text) : wrongAnswer(s.question.text));
+    }
+    s = await S();
+    await settle();
+    if (i < 3) { check(`${name}: question ${i + 2} of 4 follows without drawing anyone else`, (await adm('next')).status === 200 && (await S()).round.qNum === i + 2); }
+  }
+  check(`${name} played 4 different ${played[name]} questions`, texts.size === 4, String(texts.size));
+  s = await S();
+  check(turn < 3 ? 'after the 4th question the round is not over (more teams to go)' : 'after the last team, the round is over',
+    turn < 3 ? s.reveal.lastInRound === false && s.reveal.nextTeam === true : s.reveal.lastInRound === true && s.reveal.nextTeam === false);
+  if (turn < 3) {
+    await settle();
+    await adm('next');
+    s = await S();
+    check('then a different team is drawn from those who have not played', s.phase === 'pick' && !drawn.includes(s.pick.chooserName) && s.pick.turnNo === turn + 1);
+  }
 }
-check('choosers rotate through all teams', new Set(choosers.slice(0, 3)).size === 3, choosers.slice(0, 4).join());
-check('each category was played 8 times', Object.values(catsSeen).length === 4 && Object.values(catsSeen).every((n) => n === 8), JSON.stringify(catsSeen));
-check('round 2 ends with the last question flagged', (await S()).reveal.lastInRound === true);
+check('every team got exactly one turn, in a drawn order', new Set(drawn).size === 3);
+check('three different categories were played', new Set(Object.values(played)).size === 3);
 
 // ---- The 30 minute break ----
 await adm('next');
@@ -184,17 +225,24 @@ await adm('startround');
 const faceItems = Object.fromEntries(ROUNDS[3].items.map((i) => [i.image, i]));
 const names = new Set(ROUNDS[3].items.map((i) => i.answer));
 let facesOk = true;
+const crops = new Set();
+let cropsOk = true, revealHasCrop = true;
 for (let i = 0; i < 18; i++) {
   s = await S();
   seen++;
+  crops.add(s.question.crop);
+  if (!CROP_PRESETS.includes(s.question.crop) || s.question.crop !== faceItems[s.question.image].crop) cropsOk = false;
   const it = faceItems[s.question.image];
   if (!it || !s.question.options.every((o) => names.has(o)) || !s.question.options.includes(it.answer)) facesOk = false;
   clock += 800; await allAnswer([s.question.options.indexOf(it.answer), 0, 0]);
   if (i < 17) await adm('next');
 }
 check('18 face questions; every option is a Kenyan comedian from the list', facesOk);
+check('every face question is cropped (eyes, smile or half a face) and the screens are told which crop', cropsOk);
+check('the face round uses all four crop styles', crops.size === 4, [...crops].join());
+check('non-photo rounds are not cropped', ROUNDS.slice(0, 3).every((r) => !r.crop && !(r.items || []).some((i) => i.crop)));
 check('the last question of the last round is flagged as the end of the game', (await S()).reveal.lastInGame === true);
-check(`all ${TOTAL_QUESTIONS} questions were played`, seen === TOTAL_QUESTIONS, String(seen));
+check('every question of a 3-team game was played (30 + 12 + 20 + 18)', seen === 80, String(seen));
 
 // ---- Final ----
 await adm('next');

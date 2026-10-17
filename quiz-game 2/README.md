@@ -6,12 +6,13 @@ Screens ask for updates about once a second (much slower during the break).
 
 ## The four rounds
 1. **General knowledge** (30 questions). Every team answers every question.
-2. **Claim your category** (8 categories: Sports, History, CRE, Entertainment, Science, Geography, Music, Kenya).
-   Teams take turns claiming a category, lowest score first (15 seconds to choose, then a free one is assigned;
-   the host can also claim for a team). A claimed category belongs to that team alone: it answers 4 of its
-   questions, one after another, and no other team can answer them (their phones show a watch screen).
-   Only the owning team scores on its questions. With 8 teams that is 32 questions; with fewer teams,
-   fewer categories are used. Change the 4 with `perTeam` on round 2 in `questions/quiz.json`.
+2. **Claim your category** (8 categories: Sports, History, JW, Entertainment, Science, Geography, Music, Kenya).
+   A team is drawn at random and chooses a category on its phone (15 seconds, then a free one is assigned; the
+   host can also choose for it). It then plays that category straight away, alone: 4 of its questions, one after
+   another, and no other team can answer them (their phones show a watch screen). When it is done, the next team
+   is drawn from those who have not played yet. A category that has been chosen is taken, so no other team can
+   choose it. Only the team that is playing scores. With 8 teams that is 32 questions. Change the 4 with `perTeam`
+   on round 2 in `questions/quiz.json`. (With more teams than categories, the extra teams do not get a turn.)
    **A 30 minute break follows this round.**
 3. **Guess the logo** (20 questions). A logo is shown, teams pick the brand.
 4. **Guess the face** (18 questions). Only part of a face is shown (the eyes, the smile, or half the face),
@@ -125,3 +126,19 @@ Add `"seconds": 30` to give one question more time.
 About one function call per second per screen while a question is open: roughly 10 per second with 8 teams
 plus the host, around 36,000 an hour. During the 30 minute break it drops to about 2 per second. Change the
 numbers in `pollDelay()` in `public/shared.js` to trade speed for fewer calls.
+
+## Typed-number questions (the JW category)
+Some questions are answered by typing a number on the team's phone, for example "How many books are in the Bible?".
+In `questions/quiz.json` they look like this:
+
+    { "type": "number", "text": "How many books are in the Bible?", "answer": 66, "seconds": 25 }
+
+- A typed answer counts only if it matches exactly. Add `"tolerance": 10` to accept anything within 10 either way.
+- Any round can use them, but they are meant for category rounds.
+- **Questions with no saved answer (the Njakai numbers).** The four JW questions about Njakai have
+  `"answer": null`. They are asked like any other: the team that is playing types its number. When the question
+  closes, the host's screen shows what the team typed and a box in the bottom bar: type the correct number and
+  press **Confirm answer**, and the points are awarded (speed bonus still counts, based on when the team answered).
+  The host cannot move on until a number is entered. **No points for this one** skips scoring. The host's lobby
+  lists these questions as a reminder. If you already know the number, put it in `quiz.json` in place of `null`
+  (for example `"answer": 14`) and the step is skipped.

@@ -30,6 +30,14 @@ function cropOk(c) {
 export const ROUNDS = QUIZ.rounds;
 
 function checkQuestion(q, where) {
+  if (q && q.type === 'number') {
+    // Typed answer. "answer": null means "not filled in yet": the question is skipped until it has one.
+    const ok = typeof q.text === 'string' &&
+      (q.answer === null || (typeof q.answer === 'number' && Number.isFinite(q.answer))) &&
+      (q.tolerance === undefined || (typeof q.tolerance === 'number' && q.tolerance >= 0));
+    if (!ok) throw new Error(`${where} is invalid: a "number" question needs "text" and an "answer" (a number, or null until you know it).`);
+    return;
+  }
   const ok =
     q && typeof q.text === 'string' && Array.isArray(q.options) &&
     q.options.length >= 2 && q.options.length <= 4 &&
@@ -62,6 +70,14 @@ ROUNDS.forEach((r, ri) => {
   }
 });
 
+// Typed-number questions with "answer": null have no saved answer. They are still asked; when one closes,
+// the host types the correct number and the points are awarded then. The host's lobby lists them as a reminder.
+export const LIVE_ANSWER_QUESTIONS = [];
+for (const r of ROUNDS) {
+  for (const q of r.questions || []) if (q.type === 'number' && q.answer === null) LIVE_ANSWER_QUESTIONS.push(q.text);
+  for (const c of r.categories || []) for (const q of c.questions) if (q.type === 'number' && q.answer === null) LIVE_ANSWER_QUESTIONS.push(q.text);
+}
+
 // Claim rounds: each team that claims a category answers this many of its questions.
 const claimPer = (r) =>
   Math.min(Number(r.perTeam) > 0 ? Number(r.perTeam) : Infinity, ...r.categories.map((c) => c.questions.length));
@@ -71,7 +87,7 @@ export const roundTotal = (r) =>
     : r.kind === 'pick' ? r.categories.reduce((n, c) => n + c.questions.length, 0)
     : r.kind === 'image' ? r.items.length : r.questions.length;
 // How many questions this round will have in this game (claim rounds depend on the teams that claimed).
-const roundLen = (g, r) => (r.kind === 'claim' && g.plan.length ? g.plan.length * claimPer(r) : roundTotal(r));
+const roundLen = (g, r) => (r.kind === 'claim' ? (g.turn ? g.turn.qs.length : claimPer(r)) : roundTotal(r));
 
 export const TOTAL_QUESTIONS = ROUNDS.reduce((n, r) => n + roundTotal(r), 0);
 
@@ -108,8 +124,10 @@ export function newGame(teams = {}) {
     pickCursor: 0,      // pick rounds: whose turn it is to choose
     pick: null,         // { chooser, seconds, endsAt }
     claims: {},         // claim rounds: category id -> team id that owns it
-    claimQueue: [],     // claim rounds: teams still to claim, lowest score first
-    plan: [],           // claim rounds: [{ team, cat, qs }] in the order teams will play
+    turnsLeft: [],      // claim rounds: teams that have not had their turn yet
+    turn: null,         // claim rounds: { team, cat, qs, i } the team playing now
+    turnNo: 0,          // claim rounds: how many teams have been drawn so far
+    turnTotal: 0,       // claim rounds: how many teams will get a turn
     between: null,      // { next, breakEndsAt }
     cur: null,          // the current question, including the correct answer (never sent to screens)
     teams,              // id -> team
@@ -184,12 +202,17 @@ export function view(g, now, who = {}) {
     maxTeams: MAX_TEAMS,
     teamSize: TEAM_SIZE,
     totalQuestions: TOTAL_QUESTIONS,
-    round: r ? { n: g.round + 1, of: ROUNDS.length, title: r.title, kind: r.kind, qNum: g.qNum + 1, qTotal: roundLen(g, r) } : null,
+    // Claim rounds number the questions within the team's own turn ("question 2 of 4").
+    round: r ? {
+      n: g.round + 1, of: ROUNDS.length, title: r.title, kind: r.kind,
+      qNum: r.kind === 'claim' ? (g.turn ? g.turn.i + 1 : 1) : g.qNum + 1, qTotal: roundLen(g, r),
+      turnNo: g.turnNo, turnTotal: g.turnTotal,
+    } : null,
     seconds: g.seconds,
     endsAt: g.endsAt,
     // The correct answer is never sent until the round is closed.
     question: showQ
-      ? { text: g.cur.text, options: g.cur.options, image: g.cur.image, crop: g.cur.crop, category: g.cur.category, chosenBy: g.cur.chosenBy,
+      ? { text: g.cur.text, type: g.cur.type, liveAnswer: g.cur.type === 'number' && g.cur.answerNum === null, options: g.cur.options, image: g.cur.image, crop: g.cur.crop, category: g.cur.category, chosenBy: g.cur.chosenBy,
           owner: g.cur.owner ? { id: g.cur.owner, name: g.teams[g.cur.owner] ? g.teams[g.cur.owner].name : '' } : null }
       : null,
     reveal: g.phase === 'reveal' ? g.reveal : null,
@@ -201,6 +224,8 @@ export function view(g, now, who = {}) {
       roundGain: t.score - (t.base || 0),
       answered: !!t.answer, by: t.answer ? t.members[t.answer.member] : null,
     })),
+    // Host's lobby screen: typed-number questions whose answer the host will type live.
+    liveAnswer: g.phase === 'lobby' ? LIVE_ANSWER_QUESTIONS : [],
     me: null,
   };
 
@@ -212,7 +237,9 @@ export function view(g, now, who = {}) {
       seconds: g.pick.seconds,
       endsAt: g.pick.endsAt,
       kind: r.kind,
-      claimsMade: g.plan.length,
+      drawn: r.kind === 'claim',            // the team was drawn at random
+      turnNo: g.turnNo + 1,                 // which team's turn this is (1 = first)
+      turnTotal: g.turnTotal,
       categories: r.categories.map((c) => {
         const owner = r.kind === 'claim' && g.claims[c.id] ? g.teams[g.claims[c.id]] : null;
         return {
@@ -240,9 +267,9 @@ export function view(g, now, who = {}) {
       id: t.id, name: t.name, score: t.score, rank: list.find((x) => x.t === t).rank,
       members: t.members, turns: t.turns,
       isChooser: g.phase === 'pick' && g.pick.chooser === t.id,
-      answer: t.answer ? { choice: t.answer.choice, member: t.answer.member } : null,
+      answer: t.answer ? { choice: t.answer.choice, value: t.answer.value, member: t.answer.member } : null,
       result: g.phase === 'reveal'
-        ? g.reveal.results[t.id] || { choice: null, member: null, correct: false, gain: 0, watching: false } : null,
+        ? g.reveal.results[t.id] || { choice: null, value: null, member: null, correct: false, gain: 0, watching: false } : null,
     };
   }
   return out;
@@ -272,10 +299,12 @@ function startRound(g, idx, now) {
     return;
   }
   if (r.kind === 'claim') {
-    // Teams claim in turn, lowest score first (join order breaks ties).
+    // A team is drawn at random, claims a category and plays it alone; then the next team is drawn.
     g.claims = {};
-    g.plan = [];
-    g.claimQueue = teamList(g).sort((a, b) => a.score - b.score).map((t) => t.id);
+    g.turn = null;
+    g.turnNo = 0;
+    g.turnsLeft = teamList(g).map((t) => t.id);
+    g.turnTotal = Math.min(g.turnsLeft.length, r.categories.length);
     startPick(g, now);
     return;
   }
@@ -290,8 +319,11 @@ function startPick(g, now) {
   if (!teams.length) throw new HttpError(409, 'There are no teams left in the game.');
   let chooser;
   if (r.kind === 'claim') {
-    while (g.claimQueue.length && !g.teams[g.claimQueue[0]]) g.claimQueue.shift(); // skip removed teams
-    chooser = g.teams[g.claimQueue[0]];
+    const alive = g.turnsLeft.filter((id) => g.teams[id]);
+    if (!alive.length) { endRound(g, now); return; }
+    const id = alive[Math.floor(Math.random() * alive.length)];   // the draw
+    g.turnsLeft = alive.filter((x) => x !== id);
+    chooser = g.teams[id];
   } else {
     chooser = teams[g.pickCursor % teams.length];
     g.pickCursor += 1;
@@ -310,16 +342,12 @@ const availableCategories = (g) => {
     : r.categories.filter((c) => (g.used[c.id] || 0) < c.questions.length);
 };
 
-// If a team was removed mid-round, skip the questions it would have answered.
-// Returns false when nothing is left to play.
-function skipRemovedOwners(g, r) {
-  const per = claimPer(r);
-  const len = roundLen(g, r);
-  while (g.qNum < len && !g.teams[g.plan[Math.floor(g.qNum / per)].team]) g.qNum = (Math.floor(g.qNum / per) + 1) * per;
-  return g.qNum < len;
-}
+// Claim rounds: is the team in the spotlight finished (or gone), and is there another team to draw?
+const blockDone = (g) => !g.turn || !g.teams[g.turn.team] || g.turn.i + 1 >= g.turn.qs.length;
+const moreTurns = (g) => g.turnsLeft.some((id) => g.teams[id]) && availableCategories(g).length > 0;
 
-// Claim round: the team whose turn it is takes a category. Nobody else can answer its questions.
+// Claim round: the team that was drawn takes a category and plays it alone, starting right away.
+// Nobody else can answer its questions, and nobody else can take the category.
 function claimCategory(g, catId, now) {
   const r = ROUNDS[g.round];
   const cat = r.categories.find((c) => c.id === catId);
@@ -330,15 +358,9 @@ function claimCategory(g, catId, now) {
   }
   const teamId = g.pick.chooser;
   g.claims[cat.id] = teamId;
-  g.plan.push({ team: teamId, cat: cat.id, qs: shuffle(cat.questions.map((_, i) => i)).slice(0, claimPer(r)) });
-  if (g.claimQueue[0] === teamId) g.claimQueue.shift();
-  while (g.claimQueue.length && !g.teams[g.claimQueue[0]]) g.claimQueue.shift();
-  if (g.claimQueue.length && availableCategories(g).length) {
-    startPick(g, now);       // the next team claims
-  } else {
-    g.qNum = 0;              // everyone has claimed: the spotlight rounds begin
-    if (skipRemovedOwners(g, r)) startQuestion(g, now); else endRound(g, now);
-  }
+  g.turnNo += 1;
+  g.turn = { team: teamId, cat: cat.id, qs: shuffle(cat.questions.map((_, i) => i)).slice(0, claimPer(r)), i: 0 };
+  startQuestion(g, now);
 }
 
 function pickCategory(g, catId, now, how) {
@@ -362,15 +384,17 @@ function startQuestion(g, now, given) {
   let q;
   if (r.kind === 'pick') q = { ...given.q, category: given.category, chosenBy: given.chosenBy };
   else if (r.kind === 'claim') {
-    const per = claimPer(r);
-    const entry = g.plan[Math.floor(g.qNum / per)];
-    const cat = r.categories.find((c) => c.id === entry.cat);
-    q = { ...cat.questions[entry.qs[g.qNum % per]], category: cat.name, owner: entry.team };
+    const cat = r.categories.find((c) => c.id === g.turn.cat);
+    q = { ...cat.questions[g.turn.qs[g.turn.i]], category: cat.name, owner: g.turn.team };
   } else if (r.kind === 'image') q = imageQuestion(r, r.items[g.order[g.qNum]]);
   else q = { ...r.questions[g.order[g.qNum]] };
   const secs = Number(q.seconds) > 0 ? Number(q.seconds) : Number(r.seconds) > 0 ? Number(r.seconds) : DEFAULT_SECONDS;
+  const number = q.type === 'number';
   g.cur = {
-    text: q.text, options: q.options, correct: q.correct,
+    type: number ? 'number' : 'choice',
+    answerNum: number ? q.answer : null,        // typed-number questions: the right number (never sent until the reveal)
+    tolerance: number ? q.tolerance || 0 : 0,   // ...and how far off a typed answer may be and still count
+    text: q.text, options: q.options || [], correct: number ? null : q.correct,
     image: q.image || null, crop: q.crop || null, category: q.category || null, chosenBy: q.chosenBy || null,
     owner: q.owner || null,   // claim rounds: the only team that can answer this question
   };
@@ -383,19 +407,27 @@ function startQuestion(g, now, given) {
   for (const t of teamList(g)) t.answer = null;
 }
 
-function endQuestion(g) {
-  if (g.phase !== 'question') return;
-  const r = ROUNDS[g.round];
+// Works out who was right and awards the points. Runs when a question closes, or a little later for a
+// typed-number question whose answer the host enters live. Speed bonuses use when each team answered.
+function scoreQuestion(g) {
   const span = g.seconds * 1000;
+  const number = g.cur.type === 'number';
   const counts = g.cur.options.map(() => 0);
   const results = {};
   for (const t of teamList(g)) {
-    let gain = 0, choice = null, member = null, correct = false;
+    let gain = 0, choice = null, value = null, member = null, correct = false;
     if (t.answer) {
-      choice = t.answer.choice;
       member = t.members[t.answer.member] ?? null;
-      counts[choice] += 1;
-      if (choice === g.cur.correct) {
+      let right;
+      if (number) {
+        value = t.answer.value;
+        right = Math.abs(value - g.cur.answerNum) <= g.cur.tolerance + 1e-9;
+      } else {
+        choice = t.answer.choice;
+        counts[choice] += 1;
+        right = choice === g.cur.correct;
+      }
+      if (right) {
         correct = true;
         const left = Math.max(0, g.endsAt - t.answer.at);
         gain = BASE_POINTS + Math.round((MAX_BONUS * left) / span);
@@ -404,11 +436,46 @@ function endQuestion(g) {
         t.totalMs += t.answer.at - g.startedAt;
       }
     }
-    results[t.id] = { choice, member, correct, gain, watching: Boolean(g.cur.owner && g.cur.owner !== t.id) };
+    results[t.id] = { choice, value, member, correct, gain, watching: Boolean(g.cur.owner && g.cur.owner !== t.id) };
   }
-  const lastInRound = g.qNum + 1 >= roundLen(g, r);
-  g.reveal = { correct: g.cur.correct, counts, results, lastInRound, lastInGame: lastInRound && g.round === ROUNDS.length - 1 };
+  return { counts, results };
+}
+
+function endQuestion(g) {
+  if (g.phase !== 'question') return;
+  const r = ROUNDS[g.round];
+  const number = g.cur.type === 'number';
+  const live = number && g.cur.answerNum === null;   // no saved answer: the host types it now
+  let counts = [], results = {};
+  if (live) {
+    // No points yet: just record what each team typed. Points are awarded when the host enters the answer.
+    for (const t of teamList(g)) {
+      results[t.id] = {
+        choice: null, value: t.answer ? t.answer.value : null,
+        member: t.answer ? t.members[t.answer.member] ?? null : null,
+        correct: false, gain: 0, watching: Boolean(g.cur.owner && g.cur.owner !== t.id),
+      };
+    }
+  } else ({ counts, results } = scoreQuestion(g));
+  const lastInRound = r.kind === 'claim' ? blockDone(g) && !moreTurns(g) : g.qNum + 1 >= roundLen(g, r);
+  g.reveal = {
+    type: g.cur.type, correct: g.cur.correct,
+    answerValue: number ? g.cur.answerNum : null, tolerance: g.cur.tolerance,
+    pending: live,                       // true until the host enters the correct number
+    counts, results, lastInRound, lastInGame: lastInRound && g.round === ROUNDS.length - 1,
+    nextTeam: r.kind === 'claim' && blockDone(g) && moreTurns(g),   // claim rounds: the next team will be drawn
+  };
   g.phase = 'reveal';
+}
+
+// The host enters the correct number for a typed question that had none saved (or skips it: no points).
+function settleAnswer(g, value) {
+  if (g.phase !== 'reveal' || !g.reveal.pending) throw new HttpError(409, 'There is no answer to enter right now.');
+  g.reveal.pending = false;
+  if (value === null) { g.reveal.skipped = true; return; }
+  g.cur.answerNum = value;
+  const { counts, results } = scoreQuestion(g);
+  Object.assign(g.reveal, { counts, results, answerValue: value });
 }
 
 function endRound(g, now) {
@@ -493,21 +560,28 @@ export function answer(g, body, now) {
     throw new HttpError(403, `This question belongs to ${owner ? owner.name : 'another team'}. Watch the screen.`);
   }
   if (now > g.endsAt + GRACE_MS) throw new HttpError(409, 'Time is up.');
-  const choice = Number(body.choice);
-  if (!Number.isInteger(choice) || choice < 0 || choice >= g.cur.options.length) {
-    throw new HttpError(400, 'Invalid choice.');
+  let choice = null, value = null;
+  if (g.cur.type === 'number') {
+    const typed = String(body.value ?? '').replace(/[\s,]/g, '');
+    value = typed === '' ? NaN : Number(typed);
+    if (!Number.isFinite(value) || Math.abs(value) > 1e9) throw new HttpError(400, 'Type a number.');
+  } else {
+    choice = Number(body.choice);
+    if (!Number.isInteger(choice) || choice < 0 || choice >= g.cur.options.length) {
+      throw new HttpError(400, 'Invalid choice.');
+    }
   }
-  if (t.answer) return { ok: true, choice: t.answer.choice, already: true }; // first tap locks in
+  if (t.answer) return { ok: true, choice: t.answer.choice, value: t.answer.value, already: true }; // first tap locks in
 
   // Who answers: the member the phone picked, or whoever has answered least so far.
   let member = Number(body.member);
   if (!Number.isInteger(member) || member < 0 || member >= t.members.length) {
     member = t.turns.indexOf(Math.min(...t.turns));
   }
-  t.answer = { choice, member, at: Math.min(now, g.endsAt) };
+  t.answer = { choice, value, member, at: Math.min(now, g.endsAt) };
   t.turns[member] += 1;
   if (allIn(g)) endQuestion(g); // everyone who can answer is in: no need to wait
-  return { ok: true, choice, member };
+  return { ok: true, choice, value, member };
 }
 
 // Has every team that is allowed to answer this question answered it?
@@ -537,17 +611,33 @@ export function admin(g, action, body, now) {
       if (!teamList(g).length) throw new HttpError(409, 'At least one team has to join first.');
       startRound(g, 0, now);
       return { ok: true };
+    case 'setanswer': {
+      const v = Number(String(body.value ?? '').replace(/[\s,]/g, ''));
+      if (String(body.value ?? '').trim() === '' || !Number.isFinite(v)) throw new HttpError(400, 'Type the correct number.');
+      if (g.phase === 'question' && g.cur.type === 'number' && g.cur.answerNum === null) { g.cur.answerNum = v; return { ok: true }; } // known early
+      settleAnswer(g, v);
+      return { ok: true };
+    }
+    case 'skipanswer':
+      settleAnswer(g, null);
+      return { ok: true };
     case 'close':
       if (g.phase !== 'question') throw new HttpError(409, 'No question is open.');
       endQuestion(g);
       return { ok: true };
     case 'next': {
       if (g.phase !== 'reveal') throw new HttpError(409, 'Close the current question first.');
+      if (g.reveal.pending) throw new HttpError(409, 'Type the correct number first, or choose "No points for this one".');
       const r = ROUNDS[g.round];
+      if (r.kind === 'claim') {
+        if (!blockDone(g)) { g.turn.i += 1; g.qNum += 1; startQuestion(g, now); }  // same team, next question
+        else if (moreTurns(g)) startPick(g, now);                                  // draw the next team
+        else endRound(g, now);
+        return { ok: true };
+      }
       if (g.qNum + 1 < roundLen(g, r)) {
         g.qNum += 1;
         if (r.kind === 'pick') startPick(g, now);
-        else if (r.kind === 'claim' && !skipRemovedOwners(g, r)) endRound(g, now);
         else startQuestion(g, now);
       } else endRound(g, now);
       return { ok: true };
@@ -584,7 +674,11 @@ export function admin(g, action, body, now) {
     case 'kick': {
       const id = String(body.teamId);
       delete g.teams[id];
-      if (g.phase === 'pick' && g.pick.chooser === id && teamList(g).length) startPick(g, now); // someone else's turn
+      if (g.phase === 'pick' && g.pick.chooser === id) {                      // the team that was drawn is gone
+        const claim = ROUNDS[g.round].kind === 'claim';
+        if (claim ? moreTurns(g) : teamList(g).length) startPick(g, now);   // someone else's turn
+        else if (claim) endRound(g, now);
+      }
       if (g.phase === 'question' && teamList(g).length && allIn(g)) endQuestion(g);
       return { ok: true };
     }

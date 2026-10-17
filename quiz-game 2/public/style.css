@@ -241,3 +241,25 @@ body.host .qv.hasimg .imgcard { margin: 0 auto; }
 .p.hasimg .opts { gap: 10px; }
 .p.hasimg .chip { padding: .4em .9em; }
 .qimg { max-height: 31vh; }
+
+/* Cropped photos: only the chosen part of the picture is visible */
+.imgcard[data-crop] { position: relative; overflow: hidden; padding: 0 !important; margin: 0 auto; border-radius: 12px; }
+.imgcard[data-crop] img.qimg { visibility: hidden; border-radius: 0; }
+
+/* Cropped-photo questions: the reveal shows the whole photo, large, beside the scoreboard */
+.revbig { margin-bottom: 1em; }
+.revbig .imgcard { margin: 0 auto; }
+.revbig .qimg { max-height: 36vh; }
+
+/* Typed-number questions, the draw, and the host's lobby notice */
+.numhint { padding: 1.2em 1.4em; border-radius: 14px; background: var(--haze); border: 2px dashed var(--haze2); color: var(--mute); font-weight: 800; font-size: 1.5em; text-align: center; margin: .6em 0; }
+.bignum { font-size: clamp(64px, 11vw, 180px); font-weight: 900; line-height: 1; color: var(--spot); margin: .15em 0 .3em; font-variant-numeric: tabular-nums; }
+.drawn { color: var(--spot); font-weight: 900; letter-spacing: .08em; text-transform: uppercase; margin-top: .4em; }
+.notice { margin-top: 1.4em; padding: 14px 16px; border-radius: 12px; background: var(--haze); border: 2px solid var(--spot); font-size: .85em; }
+.notice ul { margin: .5em 0 .5em 1.2em; list-style: disc; }
+.notice code { background: var(--haze2); padding: 1px 6px; border-radius: 6px; }
+.p .numin { font-size: 2rem; font-weight: 900; text-align: center; padding: .6em; }
+.p .numrow { display: grid; gap: 10px; }
+
+.numhint small { display: block; margin-top: .4em; font-size: .6em; font-weight: 600; }
+#bar .ansnum { width: 14em; max-width: 40vw; padding: .75em 1em; font-size: 1.1em; font-weight: 800; text-align: center; }
