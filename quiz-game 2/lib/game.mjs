@@ -16,6 +16,16 @@ export class HttpError extends Error {
   constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
 
+// A photo can be shown cropped while the question is open (eyes, smile, half a face) and in full
+// on the reveal. "crop" is a preset name or a region { x, y, w, h } given as fractions of the picture.
+export const CROP_PRESETS = ['eyes', 'smile', 'half-left', 'half-right'];
+function cropOk(c) {
+  if (c === undefined || c === null) return true;
+  if (typeof c === 'string') return CROP_PRESETS.includes(c);
+  return typeof c === 'object' && ['x', 'y', 'w', 'h'].every((k) => typeof c[k] === 'number') &&
+    c.x >= 0 && c.y >= 0 && c.w >= 0.05 && c.h >= 0.05 && c.x + c.w <= 1.0001 && c.y + c.h <= 1.0001;
+}
+
 // ---------- Question bank ----------
 export const ROUNDS = QUIZ.rounds;
 
@@ -31,11 +41,11 @@ function checkQuestion(q, where) {
 if (!Array.isArray(ROUNDS) || !ROUNDS.length) throw new Error('quiz.json needs a "rounds" list.');
 ROUNDS.forEach((r, ri) => {
   const w = `Round ${ri + 1}`;
-  if (!['standard', 'pick', 'image'].includes(r.kind)) throw new Error(`${w}: "kind" must be standard, pick or image.`);
+  if (!['standard', 'pick', 'claim', 'image'].includes(r.kind)) throw new Error(`${w}: "kind" must be standard, pick, claim or image.`);
   if (r.kind === 'standard') {
     if (!r.questions?.length) throw new Error(`${w} has no questions.`);
     r.questions.forEach((q, i) => checkQuestion(q, `${w}, question ${i + 1}`));
-  } else if (r.kind === 'pick') {
+  } else if (r.kind === 'pick' || r.kind === 'claim') {
     if (!r.categories?.length) throw new Error(`${w} has no categories.`);
     r.categories.forEach((c) => {
       if (!c.id || !c.name || !c.questions?.length) throw new Error(`${w}: each category needs id, name and questions.`);
@@ -46,12 +56,23 @@ ROUNDS.forEach((r, ri) => {
     const names = new Set([...r.items.map((i) => i.answer), ...(r.pool || []).map((p) => p.name)]);
     if (names.size < (r.optionCount || 4)) throw new Error(`${w}: needs at least ${r.optionCount || 4} different names across items and pool.`);
     r.items.forEach((it, i) => { if (!it.image || !it.answer) throw new Error(`${w}, item ${i + 1} needs "image" and "answer".`); });
+    const badCrop = `"crop" must be one of ${CROP_PRESETS.join(', ')}, or { "x", "y", "w", "h" } as fractions between 0 and 1`;
+    if (!cropOk(r.crop)) throw new Error(`${w}: ${badCrop}.`);
+    r.items.forEach((it, i) => { if (!cropOk(it.crop)) throw new Error(`${w}, item ${i + 1}: ${badCrop}.`); });
   }
 });
 
+// Claim rounds: each team that claims a category answers this many of its questions.
+const claimPer = (r) =>
+  Math.min(Number(r.perTeam) > 0 ? Number(r.perTeam) : Infinity, ...r.categories.map((c) => c.questions.length));
+
 export const roundTotal = (r) =>
-  r.kind === 'pick' ? r.categories.reduce((n, c) => n + c.questions.length, 0)
+  r.kind === 'claim' ? Math.min(r.categories.length, MAX_TEAMS) * claimPer(r)
+    : r.kind === 'pick' ? r.categories.reduce((n, c) => n + c.questions.length, 0)
     : r.kind === 'image' ? r.items.length : r.questions.length;
+// How many questions this round will have in this game (claim rounds depend on the teams that claimed).
+const roundLen = (g, r) => (r.kind === 'claim' && g.plan.length ? g.plan.length * claimPer(r) : roundTotal(r));
+
 export const TOTAL_QUESTIONS = ROUNDS.reduce((n, r) => n + roundTotal(r), 0);
 
 function shuffle(a) {
@@ -72,7 +93,7 @@ function imageQuestion(r, item) {
   const same = shuffle(others.filter(([, x]) => g && x === g).map(([n]) => n));
   const rest = shuffle(others.filter(([, x]) => !(g && x === g)).map(([n]) => n));
   const options = shuffle([item.answer, ...[...same, ...rest].slice(0, (r.optionCount || 4) - 1)]);
-  return { text: r.prompt || 'What is this?', options, correct: options.indexOf(item.answer), image: item.image, seconds: item.seconds };
+  return { text: r.prompt || 'What is this?', options, correct: options.indexOf(item.answer), image: item.image, seconds: item.seconds, crop: item.crop ?? r.crop ?? null };
 }
 
 // ---------- State ----------
@@ -86,6 +107,9 @@ export function newGame(teams = {}) {
     used: {},           // pick rounds: how many questions each category has used
     pickCursor: 0,      // pick rounds: whose turn it is to choose
     pick: null,         // { chooser, seconds, endsAt }
+    claims: {},         // claim rounds: category id -> team id that owns it
+    claimQueue: [],     // claim rounds: teams still to claim, lowest score first
+    plan: [],           // claim rounds: [{ team, cat, qs }] in the order teams will play
     between: null,      // { next, breakEndsAt }
     cur: null,          // the current question, including the correct answer (never sent to screens)
     teams,              // id -> team
@@ -160,12 +184,13 @@ export function view(g, now, who = {}) {
     maxTeams: MAX_TEAMS,
     teamSize: TEAM_SIZE,
     totalQuestions: TOTAL_QUESTIONS,
-    round: r ? { n: g.round + 1, of: ROUNDS.length, title: r.title, kind: r.kind, qNum: g.qNum + 1, qTotal: roundTotal(r) } : null,
+    round: r ? { n: g.round + 1, of: ROUNDS.length, title: r.title, kind: r.kind, qNum: g.qNum + 1, qTotal: roundLen(g, r) } : null,
     seconds: g.seconds,
     endsAt: g.endsAt,
     // The correct answer is never sent until the round is closed.
     question: showQ
-      ? { text: g.cur.text, options: g.cur.options, image: g.cur.image, category: g.cur.category, chosenBy: g.cur.chosenBy }
+      ? { text: g.cur.text, options: g.cur.options, image: g.cur.image, crop: g.cur.crop, category: g.cur.category, chosenBy: g.cur.chosenBy,
+          owner: g.cur.owner ? { id: g.cur.owner, name: g.teams[g.cur.owner] ? g.teams[g.cur.owner].name : '' } : null }
       : null,
     reveal: g.phase === 'reveal' ? g.reveal : null,
     final: g.phase === 'final' ? g.final : null,
@@ -186,7 +211,16 @@ export function view(g, now, who = {}) {
       chooserName: chooser ? chooser.name : '',
       seconds: g.pick.seconds,
       endsAt: g.pick.endsAt,
-      categories: r.categories.map((c) => ({ id: c.id, name: c.name, left: c.questions.length - (g.used[c.id] || 0) })),
+      kind: r.kind,
+      claimsMade: g.plan.length,
+      categories: r.categories.map((c) => {
+        const owner = r.kind === 'claim' && g.claims[c.id] ? g.teams[g.claims[c.id]] : null;
+        return {
+          id: c.id, name: c.name,
+          left: r.kind === 'claim' ? (g.claims[c.id] ? 0 : claimPer(r)) : c.questions.length - (g.used[c.id] || 0),
+          owner: owner ? owner.name : null,
+        };
+      }),
     };
   }
   if (g.phase === 'between') {
@@ -208,7 +242,7 @@ export function view(g, now, who = {}) {
       isChooser: g.phase === 'pick' && g.pick.chooser === t.id,
       answer: t.answer ? { choice: t.answer.choice, member: t.answer.member } : null,
       result: g.phase === 'reveal'
-        ? g.reveal.results[t.id] || { choice: null, member: null, correct: false, gain: 0 } : null,
+        ? g.reveal.results[t.id] || { choice: null, member: null, correct: false, gain: 0, watching: false } : null,
     };
   }
   return out;
@@ -237,6 +271,14 @@ function startRound(g, idx, now) {
     startPick(g, now);
     return;
   }
+  if (r.kind === 'claim') {
+    // Teams claim in turn, lowest score first (join order breaks ties).
+    g.claims = {};
+    g.plan = [];
+    g.claimQueue = teamList(g).sort((a, b) => a.score - b.score).map((t) => t.id);
+    startPick(g, now);
+    return;
+  }
   const idxs = Array.from({ length: roundTotal(r) }, (_, i) => i);
   g.order = r.kind === 'image' || r.shuffle ? shuffle(idxs) : idxs;
   startQuestion(g, now);
@@ -246,8 +288,14 @@ function startPick(g, now) {
   const r = ROUNDS[g.round];
   const teams = teamList(g);
   if (!teams.length) throw new HttpError(409, 'There are no teams left in the game.');
-  const chooser = teams[g.pickCursor % teams.length];
-  g.pickCursor += 1;
+  let chooser;
+  if (r.kind === 'claim') {
+    while (g.claimQueue.length && !g.teams[g.claimQueue[0]]) g.claimQueue.shift(); // skip removed teams
+    chooser = g.teams[g.claimQueue[0]];
+  } else {
+    chooser = teams[g.pickCursor % teams.length];
+    g.pickCursor += 1;
+  }
   const seconds = Number(r.pickSeconds) > 0 ? Number(r.pickSeconds) : DEFAULT_PICK_SECONDS;
   g.phase = 'pick';
   g.cur = null;
@@ -255,10 +303,46 @@ function startPick(g, now) {
   g.pick = { chooser: chooser.id, seconds, endsAt: now + seconds * 1000 };
 }
 
-const availableCategories = (g) =>
-  ROUNDS[g.round].categories.filter((c) => (g.used[c.id] || 0) < c.questions.length);
+const availableCategories = (g) => {
+  const r = ROUNDS[g.round];
+  return r.kind === 'claim'
+    ? r.categories.filter((c) => !g.claims[c.id])
+    : r.categories.filter((c) => (g.used[c.id] || 0) < c.questions.length);
+};
+
+// If a team was removed mid-round, skip the questions it would have answered.
+// Returns false when nothing is left to play.
+function skipRemovedOwners(g, r) {
+  const per = claimPer(r);
+  const len = roundLen(g, r);
+  while (g.qNum < len && !g.teams[g.plan[Math.floor(g.qNum / per)].team]) g.qNum = (Math.floor(g.qNum / per) + 1) * per;
+  return g.qNum < len;
+}
+
+// Claim round: the team whose turn it is takes a category. Nobody else can answer its questions.
+function claimCategory(g, catId, now) {
+  const r = ROUNDS[g.round];
+  const cat = r.categories.find((c) => c.id === catId);
+  if (!cat) throw new HttpError(400, 'Unknown category.');
+  if (g.claims[cat.id]) {
+    const owner = g.teams[g.claims[cat.id]];
+    throw new HttpError(409, `${cat.name} is already taken${owner ? ' by ' + owner.name : ''}. Pick another category.`);
+  }
+  const teamId = g.pick.chooser;
+  g.claims[cat.id] = teamId;
+  g.plan.push({ team: teamId, cat: cat.id, qs: shuffle(cat.questions.map((_, i) => i)).slice(0, claimPer(r)) });
+  if (g.claimQueue[0] === teamId) g.claimQueue.shift();
+  while (g.claimQueue.length && !g.teams[g.claimQueue[0]]) g.claimQueue.shift();
+  if (g.claimQueue.length && availableCategories(g).length) {
+    startPick(g, now);       // the next team claims
+  } else {
+    g.qNum = 0;              // everyone has claimed: the spotlight rounds begin
+    if (skipRemovedOwners(g, r)) startQuestion(g, now); else endRound(g, now);
+  }
+}
 
 function pickCategory(g, catId, now, how) {
+  if (ROUNDS[g.round].kind === 'claim') return claimCategory(g, catId, now);
   const cat = ROUNDS[g.round].categories.find((c) => c.id === catId);
   if (!cat) throw new HttpError(400, 'Unknown category.');
   if ((g.used[cat.id] || 0) >= cat.questions.length) throw new HttpError(409, `No ${cat.name} questions are left. Pick another category.`);
@@ -277,12 +361,18 @@ function startQuestion(g, now, given) {
   const r = ROUNDS[g.round];
   let q;
   if (r.kind === 'pick') q = { ...given.q, category: given.category, chosenBy: given.chosenBy };
-  else if (r.kind === 'image') q = imageQuestion(r, r.items[g.order[g.qNum]]);
+  else if (r.kind === 'claim') {
+    const per = claimPer(r);
+    const entry = g.plan[Math.floor(g.qNum / per)];
+    const cat = r.categories.find((c) => c.id === entry.cat);
+    q = { ...cat.questions[entry.qs[g.qNum % per]], category: cat.name, owner: entry.team };
+  } else if (r.kind === 'image') q = imageQuestion(r, r.items[g.order[g.qNum]]);
   else q = { ...r.questions[g.order[g.qNum]] };
   const secs = Number(q.seconds) > 0 ? Number(q.seconds) : Number(r.seconds) > 0 ? Number(r.seconds) : DEFAULT_SECONDS;
   g.cur = {
     text: q.text, options: q.options, correct: q.correct,
-    image: q.image || null, category: q.category || null, chosenBy: q.chosenBy || null,
+    image: q.image || null, crop: q.crop || null, category: q.category || null, chosenBy: q.chosenBy || null,
+    owner: q.owner || null,   // claim rounds: the only team that can answer this question
   };
   g.seconds = Math.min(secs, 60);
   g.phase = 'question';
@@ -314,9 +404,9 @@ function endQuestion(g) {
         t.totalMs += t.answer.at - g.startedAt;
       }
     }
-    results[t.id] = { choice, member, correct, gain };
+    results[t.id] = { choice, member, correct, gain, watching: Boolean(g.cur.owner && g.cur.owner !== t.id) };
   }
-  const lastInRound = g.qNum + 1 >= roundTotal(r);
+  const lastInRound = g.qNum + 1 >= roundLen(g, r);
   g.reveal = { correct: g.cur.correct, counts, results, lastInRound, lastInGame: lastInRound && g.round === ROUNDS.length - 1 };
   g.phase = 'reveal';
 }
@@ -398,6 +488,10 @@ export function answer(g, body, now) {
   const t = g.teams[body.teamId];
   if (!t || t.deviceId !== body.deviceId) throw new HttpError(403, "This phone isn't running a team.");
   if (g.phase !== 'question') throw new HttpError(409, 'No question is open.');
+  if (g.cur.owner && g.cur.owner !== t.id) {
+    const owner = g.teams[g.cur.owner];
+    throw new HttpError(403, `This question belongs to ${owner ? owner.name : 'another team'}. Watch the screen.`);
+  }
   if (now > g.endsAt + GRACE_MS) throw new HttpError(409, 'Time is up.');
   const choice = Number(body.choice);
   if (!Number.isInteger(choice) || choice < 0 || choice >= g.cur.options.length) {
@@ -412,8 +506,14 @@ export function answer(g, body, now) {
   }
   t.answer = { choice, member, at: Math.min(now, g.endsAt) };
   t.turns[member] += 1;
-  if (teamList(g).every((x) => x.answer)) endQuestion(g); // everyone is in: no need to wait
+  if (allIn(g)) endQuestion(g); // everyone who can answer is in: no need to wait
   return { ok: true, choice, member };
+}
+
+// Has every team that is allowed to answer this question answered it?
+function allIn(g) {
+  const eligible = g.cur.owner ? [g.teams[g.cur.owner]].filter(Boolean) : teamList(g);
+  return eligible.every((x) => x.answer);
 }
 
 // The team whose turn it is chooses the category (round 2).
@@ -444,9 +544,11 @@ export function admin(g, action, body, now) {
     case 'next': {
       if (g.phase !== 'reveal') throw new HttpError(409, 'Close the current question first.');
       const r = ROUNDS[g.round];
-      if (g.qNum + 1 < roundTotal(r)) {
+      if (g.qNum + 1 < roundLen(g, r)) {
         g.qNum += 1;
-        if (r.kind === 'pick') startPick(g, now); else startQuestion(g, now);
+        if (r.kind === 'pick') startPick(g, now);
+        else if (r.kind === 'claim' && !skipRemovedOwners(g, r)) endRound(g, now);
+        else startQuestion(g, now);
       } else endRound(g, now);
       return { ok: true };
     }
@@ -479,10 +581,13 @@ export function admin(g, action, body, now) {
       Object.assign(g, newGame(keep), { v });
       return { ok: true };
     }
-    case 'kick':
-      delete g.teams[String(body.teamId)];
-      if (g.phase === 'question' && teamList(g).length && teamList(g).every((x) => x.answer)) endQuestion(g);
+    case 'kick': {
+      const id = String(body.teamId);
+      delete g.teams[id];
+      if (g.phase === 'pick' && g.pick.chooser === id && teamList(g).length) startPick(g, now); // someone else's turn
+      if (g.phase === 'question' && teamList(g).length && allIn(g)) endQuestion(g);
       return { ok: true };
+    }
     default:
       throw new HttpError(404, 'Unknown action.');
   }

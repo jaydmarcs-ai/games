@@ -1,204 +1,1418 @@
 {
  "rounds": [
   {
-   "id": "general", "title": "General knowledge", "kind": "standard", "seconds": 20, "blurb": "Thirty mixed questions. Every team answers every question.",
+   "id": "general",
+   "title": "General knowledge",
+   "kind": "standard",
+   "seconds": 20,
+   "blurb": "Thirty mixed questions. Every team answers every question.",
    "questions": [
-    {"text": "Which planet is known as the Red Planet?", "options": ["Venus", "Mars", "Jupiter", "Mercury"], "correct": 1},
-    {"text": "How many continents are there on Earth?", "options": ["5", "6", "7", "8"], "correct": 2},
-    {"text": "Which is the largest ocean on Earth?", "options": ["Pacific", "Atlantic", "Indian", "Arctic"], "correct": 0},
-    {"text": "What is the chemical symbol for gold?", "options": ["Ag", "Au", "Gd", "Go"], "correct": 1},
-    {"text": "Who painted the Mona Lisa?", "options": ["Michelangelo", "Raphael", "Botticelli", "Leonardo da Vinci"], "correct": 3},
-    {"text": "Which is the longest river in Africa?", "options": ["Congo", "Niger", "Nile", "Zambezi"], "correct": 2},
-    {"text": "In which country is Mount Kilimanjaro?", "options": ["Kenya", "Tanzania", "Uganda", "Ethiopia"], "correct": 1},
-    {"text": "What is the hardest natural substance?", "options": ["Quartz", "Topaz", "Steel", "Diamond"], "correct": 3},
-    {"text": "Which language has the most native speakers?", "options": ["English", "Spanish", "Mandarin Chinese", "Hindi"], "correct": 2},
-    {"text": "What is the smallest prime number?", "options": ["1", "2", "3", "5"], "correct": 1},
-    {"text": "Which gas do plants take in for photosynthesis?", "options": ["Carbon dioxide", "Oxygen", "Nitrogen", "Hydrogen"], "correct": 0},
-    {"text": "Which is the largest lake in Africa?", "options": ["Lake Tanganyika", "Lake Victoria", "Lake Malawi", "Lake Turkana"], "correct": 1},
-    {"text": "How many days are there in a leap year?", "options": ["365", "366", "364", "367"], "correct": 1},
-    {"text": "What is the capital city of Australia?", "options": ["Sydney", "Melbourne", "Canberra", "Perth"], "correct": 2},
-    {"text": "Which is the highest mountain in Kenya?", "options": ["Mount Elgon", "Mount Kenya", "Mount Longonot", "Mount Suswa"], "correct": 1},
-    {"text": "How many bones does an adult human body have?", "options": ["196", "206", "216", "226"], "correct": 1},
-    {"text": "Which country gave the Statue of Liberty to the United States?", "options": ["Britain", "France", "Spain", "Italy"], "correct": 1},
-    {"text": "What is the largest animal on Earth?", "options": ["African elephant", "Blue whale", "Giraffe", "Hippopotamus"], "correct": 1},
-    {"text": "What is the currency of Japan?", "options": ["Won", "Yuan", "Yen", "Ringgit"], "correct": 2},
-    {"text": "Which is the smallest country in the world by area?", "options": ["Monaco", "Vatican City", "San Marino", "Liechtenstein"], "correct": 1},
-    {"text": "At what temperature does water boil at sea level, in degrees Celsius?", "options": ["90", "100", "110", "120"], "correct": 1},
-    {"text": "Who wrote the play Romeo and Juliet?", "options": ["Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"], "correct": 1},
-    {"text": "Which blood group is the universal red cell donor?", "options": ["A positive", "AB negative", "O negative", "B positive"], "correct": 2},
-    {"text": "Which is the largest hot desert in the world?", "options": ["Gobi", "Kalahari", "Sahara", "Arabian"], "correct": 2},
-    {"text": "How many sides does a hexagon have?", "options": ["5", "6", "7", "8"], "correct": 1},
-    {"text": "Which is the fastest land animal?", "options": ["Lion", "Leopard", "Cheetah", "Greyhound"], "correct": 2},
-    {"text": "Which planet is famous for its prominent rings?", "options": ["Jupiter", "Saturn", "Uranus", "Neptune"], "correct": 1},
-    {"text": "What is the capital city of Egypt?", "options": ["Alexandria", "Cairo", "Luxor", "Giza"], "correct": 1},
-    {"text": "Which vitamin does the body make when skin is exposed to sunlight?", "options": ["Vitamin A", "Vitamin C", "Vitamin D", "Vitamin K"], "correct": 2},
-    {"text": "How many keys does a standard piano have?", "options": ["66", "76", "88", "98"], "correct": 2}
+    {
+     "text": "Which planet is known as the Red Planet?",
+     "options": [
+      "Venus",
+      "Mars",
+      "Jupiter",
+      "Mercury"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "How many continents are there on Earth?",
+     "options": [
+      "5",
+      "6",
+      "7",
+      "8"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "Which is the largest ocean on Earth?",
+     "options": [
+      "Pacific",
+      "Atlantic",
+      "Indian",
+      "Arctic"
+     ],
+     "correct": 0
+    },
+    {
+     "text": "What is the chemical symbol for gold?",
+     "options": [
+      "Ag",
+      "Au",
+      "Gd",
+      "Go"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Who painted the Mona Lisa?",
+     "options": [
+      "Michelangelo",
+      "Raphael",
+      "Botticelli",
+      "Leonardo da Vinci"
+     ],
+     "correct": 3
+    },
+    {
+     "text": "Which is the longest river in Africa?",
+     "options": [
+      "Congo",
+      "Niger",
+      "Nile",
+      "Zambezi"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "In which country is Mount Kilimanjaro?",
+     "options": [
+      "Kenya",
+      "Tanzania",
+      "Uganda",
+      "Ethiopia"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "What is the hardest natural substance?",
+     "options": [
+      "Quartz",
+      "Topaz",
+      "Steel",
+      "Diamond"
+     ],
+     "correct": 3
+    },
+    {
+     "text": "Which language has the most native speakers?",
+     "options": [
+      "English",
+      "Spanish",
+      "Mandarin Chinese",
+      "Hindi"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "What is the smallest prime number?",
+     "options": [
+      "1",
+      "2",
+      "3",
+      "5"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Which gas do plants take in for photosynthesis?",
+     "options": [
+      "Carbon dioxide",
+      "Oxygen",
+      "Nitrogen",
+      "Hydrogen"
+     ],
+     "correct": 0
+    },
+    {
+     "text": "Which is the largest lake in Africa?",
+     "options": [
+      "Lake Tanganyika",
+      "Lake Victoria",
+      "Lake Malawi",
+      "Lake Turkana"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "How many days are there in a leap year?",
+     "options": [
+      "365",
+      "366",
+      "364",
+      "367"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "What is the capital city of Australia?",
+     "options": [
+      "Sydney",
+      "Melbourne",
+      "Canberra",
+      "Perth"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "Which is the highest mountain in Kenya?",
+     "options": [
+      "Mount Elgon",
+      "Mount Kenya",
+      "Mount Longonot",
+      "Mount Suswa"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "How many bones does an adult human body have?",
+     "options": [
+      "196",
+      "206",
+      "216",
+      "226"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Which country gave the Statue of Liberty to the United States?",
+     "options": [
+      "Britain",
+      "France",
+      "Spain",
+      "Italy"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "What is the largest animal on Earth?",
+     "options": [
+      "African elephant",
+      "Blue whale",
+      "Giraffe",
+      "Hippopotamus"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "What is the currency of Japan?",
+     "options": [
+      "Won",
+      "Yuan",
+      "Yen",
+      "Ringgit"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "Which is the smallest country in the world by area?",
+     "options": [
+      "Monaco",
+      "Vatican City",
+      "San Marino",
+      "Liechtenstein"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "At what temperature does water boil at sea level, in degrees Celsius?",
+     "options": [
+      "90",
+      "100",
+      "110",
+      "120"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Who wrote the play Romeo and Juliet?",
+     "options": [
+      "Charles Dickens",
+      "William Shakespeare",
+      "Jane Austen",
+      "Mark Twain"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Which blood group is the universal red cell donor?",
+     "options": [
+      "A positive",
+      "AB negative",
+      "O negative",
+      "B positive"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "Which is the largest hot desert in the world?",
+     "options": [
+      "Gobi",
+      "Kalahari",
+      "Sahara",
+      "Arabian"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "How many sides does a hexagon have?",
+     "options": [
+      "5",
+      "6",
+      "7",
+      "8"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Which is the fastest land animal?",
+     "options": [
+      "Lion",
+      "Leopard",
+      "Cheetah",
+      "Greyhound"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "Which planet is famous for its prominent rings?",
+     "options": [
+      "Jupiter",
+      "Saturn",
+      "Uranus",
+      "Neptune"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "What is the capital city of Egypt?",
+     "options": [
+      "Alexandria",
+      "Cairo",
+      "Luxor",
+      "Giza"
+     ],
+     "correct": 1
+    },
+    {
+     "text": "Which vitamin does the body make when skin is exposed to sunlight?",
+     "options": [
+      "Vitamin A",
+      "Vitamin C",
+      "Vitamin D",
+      "Vitamin K"
+     ],
+     "correct": 2
+    },
+    {
+     "text": "How many keys does a standard piano have?",
+     "options": [
+      "66",
+      "76",
+      "88",
+      "98"
+     ],
+     "correct": 2
+    }
    ]
   },
   {
-   "id": "pick", "title": "Pick your category", "kind": "pick", "seconds": 20, "pickSeconds": 15, "breakAfterMinutes": 30, "blurb": "Teams take turns choosing the category for each question: Sports, History, CRE or Entertainment. Every team answers it.",
+   "id": "pick",
+   "title": "Claim your category",
+   "kind": "claim",
+   "seconds": 20,
+   "pickSeconds": 15,
+   "breakAfterMinutes": 30,
+   "blurb": "Teams take turns claiming a category, lowest score first. Each team then answers its own category's questions, and no other team can answer them.",
    "categories": [
-    {"id": "sports", "name": "Sports", "questions": [
-      {"text": "Which country won the 2022 FIFA World Cup?", "options": ["Brazil", "France", "Croatia", "Argentina"], "correct": 3},
-      {"text": "Which Kenyan ran the first marathon in under two hours, in a special 2019 event in Vienna?", "options": ["Eliud Kipchoge", "David Rudisha", "Geoffrey Kamworor", "Kipchoge Keino"], "correct": 0},
-      {"text": "Which country hosted the 2016 Summer Olympics?", "options": ["China", "United Kingdom", "Brazil", "Greece"], "correct": 2},
-      {"text": "David Rudisha holds the world record in which event?", "options": ["400 metres", "1500 metres", "Marathon", "800 metres"], "correct": 3},
-      {"text": "How many rings are on the Olympic flag?", "options": ["4", "5", "6", "7"], "correct": 1},
-      {"text": "Which country has won the most men's FIFA World Cups?", "options": ["Brazil", "Germany", "Italy", "Argentina"], "correct": 0},
-      {"text": "In which sport do you score a birdie?", "options": ["Tennis", "Cricket", "Golf", "Rugby"], "correct": 2},
-      {"text": "Which Kenyan won the women's 1500 metres Olympic gold medal at Paris 2024?", "options": ["Beatrice Chebet", "Mary Keitany", "Vivian Cheruiyot", "Faith Kipyegon"], "correct": 3}
-    ]},
-    {"id": "history", "name": "History", "questions": [
-      {"text": "In which year did Kenya gain independence?", "options": ["1957", "1960", "1963", "1964"], "correct": 2},
-      {"text": "Who was Kenya's first president?", "options": ["Daniel arap Moi", "Jomo Kenyatta", "Mwai Kibaki", "Tom Mboya"], "correct": 1},
-      {"text": "Which ancient civilisation built the Colosseum?", "options": ["Greek", "Ottoman", "Persian", "Roman"], "correct": 3},
-      {"text": "In which year did the Second World War end?", "options": ["1943", "1945", "1948", "1950"], "correct": 1},
-      {"text": "Who was the first President of the United States?", "options": ["Thomas Jefferson", "Abraham Lincoln", "John Adams", "George Washington"], "correct": 3},
-      {"text": "In which country are the Great Pyramids of Giza?", "options": ["Egypt", "Sudan", "Libya", "Iraq"], "correct": 0},
-      {"text": "Which South African leader was released from prison in 1990?", "options": ["Desmond Tutu", "Thabo Mbeki", "Nelson Mandela", "Steve Biko"], "correct": 2},
-      {"text": "In which year did the Berlin Wall fall?", "options": ["1961", "1975", "1989", "1991"], "correct": 2}
-    ]},
-    {"id": "cre", "name": "CRE", "questions": [
-      {"text": "Who built the ark in the Bible?", "options": ["Moses", "Noah", "Abraham", "Elijah"], "correct": 1},
-      {"text": "How many disciples did Jesus choose?", "options": ["7", "10", "12", "70"], "correct": 2},
-      {"text": "In which town was Jesus born?", "options": ["Bethlehem", "Nazareth", "Jerusalem", "Capernaum"], "correct": 0},
-      {"text": "Who was swallowed by a big fish?", "options": ["Daniel", "Jonah", "Peter", "Paul"], "correct": 1},
-      {"text": "What is the first book of the Bible?", "options": ["Exodus", "Psalms", "Genesis", "Matthew"], "correct": 2},
-      {"text": "Who led the Israelites out of Egypt?", "options": ["Joshua", "Aaron", "David", "Moses"], "correct": 3},
-      {"text": "Who was thrown into the lions' den?", "options": ["Daniel", "Joseph", "Elijah", "Samuel"], "correct": 0},
-      {"text": "Which disciple betrayed Jesus for thirty pieces of silver?", "options": ["Peter", "Thomas", "Andrew", "Judas Iscariot"], "correct": 3}
-    ]},
-    {"id": "entertainment", "name": "Entertainment", "questions": [
-      {"text": "Which singer is known as the Queen of Pop?", "options": ["Beyoncé", "Rihanna", "Madonna", "Adele"], "correct": 2},
-      {"text": "Which Kenyan group is famous for the song Jambo Bwana?", "options": ["Sauti Sol", "Them Mushrooms", "Elani", "Gidi Gidi Maji Maji"], "correct": 1},
-      {"text": "In The Lion King, what is the name of Simba's father?", "options": ["Scar", "Rafiki", "Timon", "Mufasa"], "correct": 3},
-      {"text": "Which Kenyan group sang the hit Sura Yako?", "options": ["Elani", "H_art the Band", "Sauti Sol", "Wakadinali"], "correct": 2},
-      {"text": "Which film won the Best Picture Oscar at the ceremony held in February 2020?", "options": ["Parasite", "Joker", "1917", "Little Women"], "correct": 0},
-      {"text": "Which Kenyan actress won an Oscar for 12 Years a Slave?", "options": ["Viola Davis", "Octavia Spencer", "Lupita Nyong'o", "Jennifer Hudson"], "correct": 2},
-      {"text": "Which streaming service produced the series Stranger Things?", "options": ["Hulu", "Disney+", "Netflix", "HBO Max"], "correct": 2},
-      {"text": "Who is known as the King of Pop?", "options": ["Prince", "Elvis Presley", "Justin Timberlake", "Michael Jackson"], "correct": 3}
-    ]}
+    {
+     "id": "sports",
+     "name": "Sports",
+     "questions": [
+      {
+       "text": "Which country won the 2022 FIFA World Cup?",
+       "options": [
+        "Brazil",
+        "France",
+        "Croatia",
+        "Argentina"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "Which Kenyan ran the first marathon in under two hours, in a special 2019 event in Vienna?",
+       "options": [
+        "Eliud Kipchoge",
+        "David Rudisha",
+        "Geoffrey Kamworor",
+        "Kipchoge Keino"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which country hosted the 2016 Summer Olympics?",
+       "options": [
+        "China",
+        "United Kingdom",
+        "Brazil",
+        "Greece"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "David Rudisha holds the world record in which event?",
+       "options": [
+        "400 metres",
+        "1500 metres",
+        "Marathon",
+        "800 metres"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "How many rings are on the Olympic flag?",
+       "options": [
+        "4",
+        "5",
+        "6",
+        "7"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "Which country has won the most men's FIFA World Cups?",
+       "options": [
+        "Brazil",
+        "Germany",
+        "Italy",
+        "Argentina"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "In which sport do you score a birdie?",
+       "options": [
+        "Tennis",
+        "Cricket",
+        "Golf",
+        "Rugby"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which Kenyan won the women's 1500 metres Olympic gold medal at Paris 2024?",
+       "options": [
+        "Beatrice Chebet",
+        "Mary Keitany",
+        "Vivian Cheruiyot",
+        "Faith Kipyegon"
+       ],
+       "correct": 3
+      }
+     ]
+    },
+    {
+     "id": "history",
+     "name": "History",
+     "questions": [
+      {
+       "text": "In which year did Kenya gain independence?",
+       "options": [
+        "1957",
+        "1960",
+        "1963",
+        "1964"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Who was Kenya's first president?",
+       "options": [
+        "Daniel arap Moi",
+        "Jomo Kenyatta",
+        "Mwai Kibaki",
+        "Tom Mboya"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "Which ancient civilisation built the Colosseum?",
+       "options": [
+        "Greek",
+        "Ottoman",
+        "Persian",
+        "Roman"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "In which year did the Second World War end?",
+       "options": [
+        "1943",
+        "1945",
+        "1948",
+        "1950"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "Who was the first President of the United States?",
+       "options": [
+        "Thomas Jefferson",
+        "Abraham Lincoln",
+        "John Adams",
+        "George Washington"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "In which country are the Great Pyramids of Giza?",
+       "options": [
+        "Egypt",
+        "Sudan",
+        "Libya",
+        "Iraq"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which South African leader was released from prison in 1990?",
+       "options": [
+        "Desmond Tutu",
+        "Thabo Mbeki",
+        "Nelson Mandela",
+        "Steve Biko"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "In which year did the Berlin Wall fall?",
+       "options": [
+        "1961",
+        "1975",
+        "1989",
+        "1991"
+       ],
+       "correct": 2
+      }
+     ]
+    },
+    {
+     "id": "cre",
+     "name": "CRE",
+     "questions": [
+      {
+       "text": "Who built the ark in the Bible?",
+       "options": [
+        "Moses",
+        "Noah",
+        "Abraham",
+        "Elijah"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "How many disciples did Jesus choose?",
+       "options": [
+        "7",
+        "10",
+        "12",
+        "70"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "In which town was Jesus born?",
+       "options": [
+        "Bethlehem",
+        "Nazareth",
+        "Jerusalem",
+        "Capernaum"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Who was swallowed by a big fish?",
+       "options": [
+        "Daniel",
+        "Jonah",
+        "Peter",
+        "Paul"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "What is the first book of the Bible?",
+       "options": [
+        "Exodus",
+        "Psalms",
+        "Genesis",
+        "Matthew"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Who led the Israelites out of Egypt?",
+       "options": [
+        "Joshua",
+        "Aaron",
+        "David",
+        "Moses"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "Who was thrown into the lions' den?",
+       "options": [
+        "Daniel",
+        "Joseph",
+        "Elijah",
+        "Samuel"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which disciple betrayed Jesus for thirty pieces of silver?",
+       "options": [
+        "Peter",
+        "Thomas",
+        "Andrew",
+        "Judas Iscariot"
+       ],
+       "correct": 3
+      }
+     ]
+    },
+    {
+     "id": "entertainment",
+     "name": "Entertainment",
+     "questions": [
+      {
+       "text": "Which singer is known as the Queen of Pop?",
+       "options": [
+        "Beyoncé",
+        "Rihanna",
+        "Madonna",
+        "Adele"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which Kenyan group is famous for the song Jambo Bwana?",
+       "options": [
+        "Sauti Sol",
+        "Them Mushrooms",
+        "Elani",
+        "Gidi Gidi Maji Maji"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "In The Lion King, what is the name of Simba's father?",
+       "options": [
+        "Scar",
+        "Rafiki",
+        "Timon",
+        "Mufasa"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "Which Kenyan group sang the hit Sura Yako?",
+       "options": [
+        "Elani",
+        "H_art the Band",
+        "Sauti Sol",
+        "Wakadinali"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which film won the Best Picture Oscar at the ceremony held in February 2020?",
+       "options": [
+        "Parasite",
+        "Joker",
+        "1917",
+        "Little Women"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which Kenyan actress won an Oscar for 12 Years a Slave?",
+       "options": [
+        "Viola Davis",
+        "Octavia Spencer",
+        "Lupita Nyong'o",
+        "Jennifer Hudson"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which streaming service produced the series Stranger Things?",
+       "options": [
+        "Hulu",
+        "Disney+",
+        "Netflix",
+        "HBO Max"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Who is known as the King of Pop?",
+       "options": [
+        "Prince",
+        "Elvis Presley",
+        "Justin Timberlake",
+        "Michael Jackson"
+       ],
+       "correct": 3
+      }
+     ]
+    },
+    {
+     "id": "science",
+     "name": "Science",
+     "questions": [
+      {
+       "text": "What gas do humans need to breathe to stay alive?",
+       "options": [
+        "Helium",
+        "Carbon dioxide",
+        "Nitrogen",
+        "Oxygen"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "What is the closest star to Earth?",
+       "options": [
+        "The Sun",
+        "Polaris",
+        "Sirius",
+        "Proxima Centauri"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "How many planets are in our solar system?",
+       "options": [
+        "7",
+        "8",
+        "9",
+        "10"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "Which force keeps us on the ground?",
+       "options": [
+        "Gravity",
+        "Magnetism",
+        "Friction",
+        "Inertia"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which part of a cell contains its DNA?",
+       "options": [
+        "Vacuole",
+        "Membrane",
+        "Nucleus",
+        "Ribosome"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "About how fast does light travel?",
+       "options": [
+        "3,000 km per second",
+        "30,000 km per second",
+        "300,000 km per second",
+        "3,000,000 km per second"
+       ],
+       "correct": 2
+      }
+     ]
+    },
+    {
+     "id": "geography",
+     "name": "Geography",
+     "questions": [
+      {
+       "text": "What is the capital city of Uganda?",
+       "options": [
+        "Dodoma",
+        "Addis Ababa",
+        "Kigali",
+        "Kampala"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "Lagos is a city in which country?",
+       "options": [
+        "Senegal",
+        "Ghana",
+        "Nigeria",
+        "Cameroon"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which ocean borders the coast of Kenya?",
+       "options": [
+        "Arctic Ocean",
+        "Atlantic Ocean",
+        "Indian Ocean",
+        "Pacific Ocean"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which is the largest continent by area?",
+       "options": [
+        "Asia",
+        "Europe",
+        "Africa",
+        "North America"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which line of latitude crosses Kenya?",
+       "options": [
+        "Tropic of Cancer",
+        "The Equator",
+        "Tropic of Capricorn",
+        "Arctic Circle"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "Which country is shaped like a boot?",
+       "options": [
+        "Portugal",
+        "Spain",
+        "Italy",
+        "Greece"
+       ],
+       "correct": 2
+      }
+     ]
+    },
+    {
+     "id": "music",
+     "name": "Music",
+     "questions": [
+      {
+       "text": "Which instrument has black and white keys?",
+       "options": [
+        "Flute",
+        "Piano",
+        "Violin",
+        "Drum"
+       ],
+       "correct": 1
+      },
+      {
+       "text": "How many letter names are used for notes in music (A to G)?",
+       "options": [
+        "5",
+        "6",
+        "7",
+        "8"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Who is known as the Queen of Soul?",
+       "options": [
+        "Diana Ross",
+        "Whitney Houston",
+        "Aretha Franklin",
+        "Tina Turner"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Bob Marley is famous for which style of music?",
+       "options": [
+        "Reggae",
+        "Rock",
+        "Jazz",
+        "Country"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which Nigerian star sang \"Essence\" with Tems?",
+       "options": [
+        "Rema",
+        "Burna Boy",
+        "Davido",
+        "Wizkid"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "Which band had members named John, Paul, George and Ringo?",
+       "options": [
+        "ABBA",
+        "Queen",
+        "The Rolling Stones",
+        "The Beatles"
+       ],
+       "correct": 3
+      }
+     ]
+    },
+    {
+     "id": "kenya",
+     "name": "Kenya",
+     "questions": [
+      {
+       "text": "How many counties does Kenya have?",
+       "options": [
+        "42",
+        "45",
+        "47",
+        "50"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "Which two languages are the official languages of Kenya?",
+       "options": [
+        "English and Kiswahili",
+        "English and French",
+        "Kiswahili and Arabic",
+        "English and Luo"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which city is nicknamed the Green City in the Sun?",
+       "options": [
+        "Nairobi",
+        "Mombasa",
+        "Kisumu",
+        "Nakuru"
+       ],
+       "correct": 0
+      },
+      {
+       "text": "Which Kenyan lake is famous for its flamingos?",
+       "options": [
+        "Lake Victoria",
+        "Lake Naivasha",
+        "Lake Turkana",
+        "Lake Nakuru"
+       ],
+       "correct": 3
+      },
+      {
+       "text": "Which Kenyan reserve is famous for the wildebeest migration?",
+       "options": [
+        "Aberdare",
+        "Amboseli",
+        "Maasai Mara",
+        "Tsavo"
+       ],
+       "correct": 2
+      },
+      {
+       "text": "What is the name of Kenya's national anthem?",
+       "options": [
+        "Jambo Kenya",
+        "Ee Mungu Nguvu Yetu",
+        "Harambee",
+        "Wimbo wa Taifa"
+       ],
+       "correct": 1
+      }
+     ]
+    }
+   ],
+   "perTeam": 4
+  },
+  {
+   "id": "logos",
+   "title": "Guess the logo",
+   "kind": "image",
+   "seconds": 15,
+   "prompt": "Which brand is this logo?",
+   "blurb": "A logo appears on the screen. Name the brand.",
+   "items": [
+    {
+     "image": "logos/01",
+     "answer": "Safaricom",
+     "group": "telecom"
+    },
+    {
+     "image": "logos/02",
+     "answer": "M-Pesa",
+     "group": "payments"
+    },
+    {
+     "image": "logos/03",
+     "answer": "Nike",
+     "group": "sportswear"
+    },
+    {
+     "image": "logos/04",
+     "answer": "Adidas",
+     "group": "sportswear"
+    },
+    {
+     "image": "logos/05",
+     "answer": "Coca-Cola",
+     "group": "drinks"
+    },
+    {
+     "image": "logos/06",
+     "answer": "KFC",
+     "group": "fastfood"
+    },
+    {
+     "image": "logos/07",
+     "answer": "McDonald's",
+     "group": "fastfood"
+    },
+    {
+     "image": "logos/08",
+     "answer": "Apple",
+     "group": "phones"
+    },
+    {
+     "image": "logos/09",
+     "answer": "Samsung",
+     "group": "phones"
+    },
+    {
+     "image": "logos/10",
+     "answer": "Google",
+     "group": "search"
+    },
+    {
+     "image": "logos/11",
+     "answer": "Netflix",
+     "group": "streaming"
+    },
+    {
+     "image": "logos/12",
+     "answer": "Spotify",
+     "group": "streaming"
+    },
+    {
+     "image": "logos/13",
+     "answer": "Tusker",
+     "group": "beer"
+    },
+    {
+     "image": "logos/14",
+     "answer": "Kenya Airways",
+     "group": "airlines"
+    },
+    {
+     "image": "logos/15",
+     "answer": "Equity Bank",
+     "group": "banks"
+    },
+    {
+     "image": "logos/16",
+     "answer": "Naivas",
+     "group": "supermarkets"
+    },
+    {
+     "image": "logos/17",
+     "answer": "Java House",
+     "group": "cafes"
+    },
+    {
+     "image": "logos/18",
+     "answer": "Toyota",
+     "group": "cars"
+    },
+    {
+     "image": "logos/19",
+     "answer": "Instagram",
+     "group": "social"
+    },
+    {
+     "image": "logos/20",
+     "answer": "WhatsApp",
+     "group": "social"
+    }
+   ],
+   "pool": [
+    {
+     "name": "Airtel",
+     "group": "telecom"
+    },
+    {
+     "name": "Telkom",
+     "group": "telecom"
+    },
+    {
+     "name": "Faiba",
+     "group": "telecom"
+    },
+    {
+     "name": "Airtel Money",
+     "group": "payments"
+    },
+    {
+     "name": "PayPal",
+     "group": "payments"
+    },
+    {
+     "name": "Visa",
+     "group": "payments"
+    },
+    {
+     "name": "Mastercard",
+     "group": "payments"
+    },
+    {
+     "name": "Puma",
+     "group": "sportswear"
+    },
+    {
+     "name": "Reebok",
+     "group": "sportswear"
+    },
+    {
+     "name": "Under Armour",
+     "group": "sportswear"
+    },
+    {
+     "name": "New Balance",
+     "group": "sportswear"
+    },
+    {
+     "name": "Pepsi",
+     "group": "drinks"
+    },
+    {
+     "name": "Fanta",
+     "group": "drinks"
+    },
+    {
+     "name": "Sprite",
+     "group": "drinks"
+    },
+    {
+     "name": "Minute Maid",
+     "group": "drinks"
+    },
+    {
+     "name": "Burger King",
+     "group": "fastfood"
+    },
+    {
+     "name": "Subway",
+     "group": "fastfood"
+    },
+    {
+     "name": "Pizza Inn",
+     "group": "fastfood"
+    },
+    {
+     "name": "Chicken Inn",
+     "group": "fastfood"
+    },
+    {
+     "name": "Domino's",
+     "group": "fastfood"
+    },
+    {
+     "name": "Huawei",
+     "group": "phones"
+    },
+    {
+     "name": "Tecno",
+     "group": "phones"
+    },
+    {
+     "name": "Nokia",
+     "group": "phones"
+    },
+    {
+     "name": "Xiaomi",
+     "group": "phones"
+    },
+    {
+     "name": "Sony",
+     "group": "phones"
+    },
+    {
+     "name": "Bing",
+     "group": "search"
+    },
+    {
+     "name": "Yahoo",
+     "group": "search"
+    },
+    {
+     "name": "Microsoft",
+     "group": "search"
+    },
+    {
+     "name": "Amazon",
+     "group": "search"
+    },
+    {
+     "name": "Showmax",
+     "group": "streaming"
+    },
+    {
+     "name": "YouTube",
+     "group": "streaming"
+    },
+    {
+     "name": "Apple Music",
+     "group": "streaming"
+    },
+    {
+     "name": "Boomplay",
+     "group": "streaming"
+    },
+    {
+     "name": "Guinness",
+     "group": "beer"
+    },
+    {
+     "name": "Heineken",
+     "group": "beer"
+    },
+    {
+     "name": "Pilsner",
+     "group": "beer"
+    },
+    {
+     "name": "White Cap",
+     "group": "beer"
+    },
+    {
+     "name": "Castle Lite",
+     "group": "beer"
+    },
+    {
+     "name": "Emirates",
+     "group": "airlines"
+    },
+    {
+     "name": "Qatar Airways",
+     "group": "airlines"
+    },
+    {
+     "name": "Ethiopian Airlines",
+     "group": "airlines"
+    },
+    {
+     "name": "Jambojet",
+     "group": "airlines"
+    },
+    {
+     "name": "RwandAir",
+     "group": "airlines"
+    },
+    {
+     "name": "KCB",
+     "group": "banks"
+    },
+    {
+     "name": "Co-operative Bank",
+     "group": "banks"
+    },
+    {
+     "name": "Absa",
+     "group": "banks"
+    },
+    {
+     "name": "Stanbic",
+     "group": "banks"
+    },
+    {
+     "name": "NCBA",
+     "group": "banks"
+    },
+    {
+     "name": "Family Bank",
+     "group": "banks"
+    },
+    {
+     "name": "Carrefour",
+     "group": "supermarkets"
+    },
+    {
+     "name": "Quickmart",
+     "group": "supermarkets"
+    },
+    {
+     "name": "Chandarana",
+     "group": "supermarkets"
+    },
+    {
+     "name": "Cleanshelf",
+     "group": "supermarkets"
+    },
+    {
+     "name": "Artcaffe",
+     "group": "cafes"
+    },
+    {
+     "name": "Dormans",
+     "group": "cafes"
+    },
+    {
+     "name": "Kaldis",
+     "group": "cafes"
+    },
+    {
+     "name": "Starbucks",
+     "group": "cafes"
+    },
+    {
+     "name": "Nissan",
+     "group": "cars"
+    },
+    {
+     "name": "Honda",
+     "group": "cars"
+    },
+    {
+     "name": "Mazda",
+     "group": "cars"
+    },
+    {
+     "name": "Subaru",
+     "group": "cars"
+    },
+    {
+     "name": "Isuzu",
+     "group": "cars"
+    },
+    {
+     "name": "Mercedes-Benz",
+     "group": "cars"
+    },
+    {
+     "name": "Facebook",
+     "group": "social"
+    },
+    {
+     "name": "TikTok",
+     "group": "social"
+    },
+    {
+     "name": "Snapchat",
+     "group": "social"
+    },
+    {
+     "name": "Telegram",
+     "group": "social"
+    },
+    {
+     "name": "X",
+     "group": "social"
+    }
    ]
   },
   {
-   "id": "logos", "title": "Guess the logo", "kind": "image", "seconds": 15, "prompt": "Which brand is this logo?", "blurb": "A logo appears on the screen. Name the brand.",
+   "id": "faces",
+   "title": "Guess the face",
+   "kind": "image",
+   "seconds": 15,
+   "prompt": "Which Kenyan comedian is this?",
+   "blurb": "Only part of a face appears: the eyes, the smile or half the face. Name the Kenyan comedian. The full photo is shown with the answer.",
    "items": [
-    {"image": "logos/01", "answer": "Safaricom", "group": "telecom"},
-    {"image": "logos/02", "answer": "M-Pesa", "group": "payments"},
-    {"image": "logos/03", "answer": "Nike", "group": "sportswear"},
-    {"image": "logos/04", "answer": "Adidas", "group": "sportswear"},
-    {"image": "logos/05", "answer": "Coca-Cola", "group": "drinks"},
-    {"image": "logos/06", "answer": "KFC", "group": "fastfood"},
-    {"image": "logos/07", "answer": "McDonald's", "group": "fastfood"},
-    {"image": "logos/08", "answer": "Apple", "group": "phones"},
-    {"image": "logos/09", "answer": "Samsung", "group": "phones"},
-    {"image": "logos/10", "answer": "Google", "group": "search"},
-    {"image": "logos/11", "answer": "Netflix", "group": "streaming"},
-    {"image": "logos/12", "answer": "Spotify", "group": "streaming"},
-    {"image": "logos/13", "answer": "Tusker", "group": "beer"},
-    {"image": "logos/14", "answer": "Kenya Airways", "group": "airlines"},
-    {"image": "logos/15", "answer": "Equity Bank", "group": "banks"},
-    {"image": "logos/16", "answer": "Naivas", "group": "supermarkets"},
-    {"image": "logos/17", "answer": "Java House", "group": "cafes"},
-    {"image": "logos/18", "answer": "Toyota", "group": "cars"},
-    {"image": "logos/19", "answer": "Instagram", "group": "social"},
-    {"image": "logos/20", "answer": "WhatsApp", "group": "social"}
+    {
+     "image": "faces/01",
+     "answer": "Churchill",
+     "crop": "eyes"
+    },
+    {
+     "image": "faces/02",
+     "answer": "Eric Omondi",
+     "crop": "smile"
+    },
+    {
+     "image": "faces/03",
+     "answer": "Njugush",
+     "crop": "half-left"
+    },
+    {
+     "image": "faces/04",
+     "answer": "Mulamwah",
+     "crop": "half-right"
+    },
+    {
+     "image": "faces/05",
+     "answer": "Jalang'o",
+     "crop": "eyes"
+    },
+    {
+     "image": "faces/06",
+     "answer": "Eddie Butita",
+     "crop": "smile"
+    },
+    {
+     "image": "faces/07",
+     "answer": "Crazy Kennar",
+     "crop": "half-left"
+    },
+    {
+     "image": "faces/08",
+     "answer": "Chipukeezy",
+     "crop": "half-right"
+    },
+    {
+     "image": "faces/09",
+     "answer": "Mammito",
+     "crop": "eyes"
+    },
+    {
+     "image": "faces/10",
+     "answer": "Terence Creative",
+     "crop": "smile"
+    },
+    {
+     "image": "faces/11",
+     "answer": "Akuku Danger",
+     "crop": "half-left"
+    },
+    {
+     "image": "faces/12",
+     "answer": "DJ Shiti",
+     "crop": "half-right"
+    },
+    {
+     "image": "faces/13",
+     "answer": "Sleepy David",
+     "crop": "eyes"
+    },
+    {
+     "image": "faces/14",
+     "answer": "Oga Obinna",
+     "crop": "smile"
+    },
+    {
+     "image": "faces/15",
+     "answer": "Dr Ofweneke",
+     "crop": "half-left"
+    },
+    {
+     "image": "faces/16",
+     "answer": "Philip Karanja",
+     "crop": "half-right"
+    },
+    {
+     "image": "faces/17",
+     "answer": "Awinja",
+     "crop": "eyes"
+    },
+    {
+     "image": "faces/18",
+     "answer": "Nyambane",
+     "crop": "smile"
+    }
    ],
-   "pool": [
-    {"name": "Airtel", "group": "telecom"},
-    {"name": "Telkom", "group": "telecom"},
-    {"name": "Faiba", "group": "telecom"},
-    {"name": "Airtel Money", "group": "payments"},
-    {"name": "PayPal", "group": "payments"},
-    {"name": "Visa", "group": "payments"},
-    {"name": "Mastercard", "group": "payments"},
-    {"name": "Puma", "group": "sportswear"},
-    {"name": "Reebok", "group": "sportswear"},
-    {"name": "Under Armour", "group": "sportswear"},
-    {"name": "New Balance", "group": "sportswear"},
-    {"name": "Pepsi", "group": "drinks"},
-    {"name": "Fanta", "group": "drinks"},
-    {"name": "Sprite", "group": "drinks"},
-    {"name": "Minute Maid", "group": "drinks"},
-    {"name": "Burger King", "group": "fastfood"},
-    {"name": "Subway", "group": "fastfood"},
-    {"name": "Pizza Inn", "group": "fastfood"},
-    {"name": "Chicken Inn", "group": "fastfood"},
-    {"name": "Domino's", "group": "fastfood"},
-    {"name": "Huawei", "group": "phones"},
-    {"name": "Tecno", "group": "phones"},
-    {"name": "Nokia", "group": "phones"},
-    {"name": "Xiaomi", "group": "phones"},
-    {"name": "Sony", "group": "phones"},
-    {"name": "Bing", "group": "search"},
-    {"name": "Yahoo", "group": "search"},
-    {"name": "Microsoft", "group": "search"},
-    {"name": "Amazon", "group": "search"},
-    {"name": "Showmax", "group": "streaming"},
-    {"name": "YouTube", "group": "streaming"},
-    {"name": "Apple Music", "group": "streaming"},
-    {"name": "Boomplay", "group": "streaming"},
-    {"name": "Guinness", "group": "beer"},
-    {"name": "Heineken", "group": "beer"},
-    {"name": "Pilsner", "group": "beer"},
-    {"name": "White Cap", "group": "beer"},
-    {"name": "Castle Lite", "group": "beer"},
-    {"name": "Emirates", "group": "airlines"},
-    {"name": "Qatar Airways", "group": "airlines"},
-    {"name": "Ethiopian Airlines", "group": "airlines"},
-    {"name": "Jambojet", "group": "airlines"},
-    {"name": "RwandAir", "group": "airlines"},
-    {"name": "KCB", "group": "banks"},
-    {"name": "Co-operative Bank", "group": "banks"},
-    {"name": "Absa", "group": "banks"},
-    {"name": "Stanbic", "group": "banks"},
-    {"name": "NCBA", "group": "banks"},
-    {"name": "Family Bank", "group": "banks"},
-    {"name": "Carrefour", "group": "supermarkets"},
-    {"name": "Quickmart", "group": "supermarkets"},
-    {"name": "Chandarana", "group": "supermarkets"},
-    {"name": "Cleanshelf", "group": "supermarkets"},
-    {"name": "Artcaffe", "group": "cafes"},
-    {"name": "Dormans", "group": "cafes"},
-    {"name": "Kaldis", "group": "cafes"},
-    {"name": "Starbucks", "group": "cafes"},
-    {"name": "Nissan", "group": "cars"},
-    {"name": "Honda", "group": "cars"},
-    {"name": "Mazda", "group": "cars"},
-    {"name": "Subaru", "group": "cars"},
-    {"name": "Isuzu", "group": "cars"},
-    {"name": "Mercedes-Benz", "group": "cars"},
-    {"name": "Facebook", "group": "social"},
-    {"name": "TikTok", "group": "social"},
-    {"name": "Snapchat", "group": "social"},
-    {"name": "Telegram", "group": "social"},
-    {"name": "X", "group": "social"}
-   ]
-  },
-  {
-   "id": "faces", "title": "Guess the face", "kind": "image", "seconds": 15, "prompt": "Which Kenyan comedian is this?", "blurb": "A face appears on the screen. Name the Kenyan comedian.",
-   "items": [
-    {"image": "faces/01", "answer": "Churchill"},
-    {"image": "faces/02", "answer": "Eric Omondi"},
-    {"image": "faces/03", "answer": "Njugush"},
-    {"image": "faces/04", "answer": "Mulamwah"},
-    {"image": "faces/05", "answer": "Jalang'o"},
-    {"image": "faces/06", "answer": "Eddie Butita"},
-    {"image": "faces/07", "answer": "Crazy Kennar"},
-    {"image": "faces/08", "answer": "Chipukeezy"},
-    {"image": "faces/09", "answer": "Mammito"},
-    {"image": "faces/10", "answer": "Terence Creative"},
-    {"image": "faces/11", "answer": "Akuku Danger"},
-    {"image": "faces/12", "answer": "DJ Shiti"},
-    {"image": "faces/13", "answer": "Sleepy David"},
-    {"image": "faces/14", "answer": "Oga Obinna"},
-    {"image": "faces/15", "answer": "Dr Ofweneke"},
-    {"image": "faces/16", "answer": "Philip Karanja"},
-    {"image": "faces/17", "answer": "Awinja"},
-    {"image": "faces/18", "answer": "Nyambane"}
-   ],
-   "pool": [
-   ]
+   "pool": []
   }
  ]
 }

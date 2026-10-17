@@ -6,12 +6,16 @@ Screens ask for updates about once a second (much slower during the break).
 
 ## The four rounds
 1. **General knowledge** (30 questions). Every team answers every question.
-2. **Pick your category** (32 questions: Sports, History, CRE, Entertainment, 8 each). Teams take turns
-   choosing the category for the next question (15 seconds to choose, then one is picked at random).
-   Every team answers it. The host can also choose for a team.
+2. **Claim your category** (8 categories: Sports, History, CRE, Entertainment, Science, Geography, Music, Kenya).
+   Teams take turns claiming a category, lowest score first (15 seconds to choose, then a free one is assigned;
+   the host can also claim for a team). A claimed category belongs to that team alone: it answers 4 of its
+   questions, one after another, and no other team can answer them (their phones show a watch screen).
+   Only the owning team scores on its questions. With 8 teams that is 32 questions; with fewer teams,
+   fewer categories are used. Change the 4 with `perTeam` on round 2 in `questions/quiz.json`.
    **A 30 minute break follows this round.**
 3. **Guess the logo** (20 questions). A logo is shown, teams pick the brand.
-4. **Guess the face** (18 questions). A face is shown, teams pick the Kenyan comedian.
+4. **Guess the face** (18 questions). Only part of a face is shown (the eyes, the smile, or half the face),
+   teams pick the Kenyan comedian, and the full photo appears with the answer.
 
 Between rounds the projector shows the standings and what each team gained that round.
 
@@ -30,7 +34,8 @@ the round 3 images, so the first logo appears instantly. Change the break in `qu
 ## Adding the logo and face images (needed before rounds 3 and 4)
 The game ships with numbered placeholder images so you can rehearse. Replace them by adding your own
 files with these exact names (png, jpg, jpeg, webp or svg all work). Any file you add wins over the placeholder.
-Logos on a transparent background work well. For faces, use a square-ish crop. Keep each file under about 300 KB.
+Logos on a transparent background work well. For faces, upload a normal portrait (head and shoulders, face
+roughly in the middle, upright): the game does the cropping itself. Keep each file under about 300 KB.
 The numbers are deliberate: the file name never gives the answer away.
 
 **Round 3: `public/img/logos/`**
@@ -57,6 +62,14 @@ The numbers are deliberate: the file name never gives the answer away.
 | 18 | Toyota | `public/img/logos/18.png` |
 | 19 | Instagram | `public/img/logos/19.png` |
 | 20 | WhatsApp | `public/img/logos/20.png` |
+
+**Partial faces (round 4).** Each face question has a `crop` in `questions/quiz.json`, rotating through four
+styles: `eyes`, `smile`, `half-left` and `half-right`. The full photo shows on the answer screen. To change one,
+edit that item's `"crop"`. Delete the `"crop"` to show the whole face. For a custom crop use a region given as
+fractions of the picture, for example `"crop": {"x": 0.2, "y": 0.3, "w": 0.6, "h": 0.2}` (x and y are the top-left
+corner, w and h the size). If a photo is framed differently (face very low, or off to one side), a custom region
+fixes it. Note: a very determined player could still open the full photo with browser tools. That is fine for a
+friendly event; if you need it airtight, crop the photos yourself before uploading.
 
 **Round 4: `public/img/faces/`**
 
