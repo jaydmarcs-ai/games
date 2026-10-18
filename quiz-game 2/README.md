@@ -127,6 +127,28 @@ About one function call per second per screen while a question is open: roughly 
 plus the host, around 36,000 an hour. During the 30 minute break it drops to about 2 per second. Change the
 numbers in `pollDelay()` in `public/shared.js` to trade speed for fewer calls.
 
+## Editing the questions (the easy way)
+Open `https://YOUR-SITE.netlify.app/questions` (there is also a button for it in the host's lobby) and enter the admin PIN.
+Nothing changes in the game until you press **Save changes**.
+
+- **Pick a round** with the tabs. Round 1 is a list of questions; round 2 has categories, each with its own
+  questions; rounds 3 and 4 are lists of pictures with the name that goes with each.
+- **Edit** the wording, the answers (tap the round button next to the right one), or the seconds. **Delete** removes a
+  question. **Add a question** adds a blank one: fill in 2 to 4 answers.
+- **Typed-number questions:** change a question's kind to "Typed number" and enter the right answer, or leave it blank
+  to type the answer live during the game. "Counts if within" accepts answers near the right one.
+- **Categories:** rename, add or delete them. Each team that picks a category plays "Questions each team plays" of its
+  questions (a warning appears if a category has fewer than that).
+- **Pictures:** adding a picture adds a slot for it, then upload its image on the Pictures page. The wrong options
+  come from the other names, plus the "extra wrong answers" list at the bottom of the round.
+- **Round settings:** title, intro text, seconds per question, and the break after the round (in minutes).
+- If something cannot be saved, a red message says exactly which question to fix, and nothing is changed.
+- **Between games only:** while a game is running, saving is locked (End game or clear it first).
+- **Download a backup** saves your questions to a file; **Load from a file** brings them back (then press Save changes).
+- **Back to the original questions** throws your edits away and returns to the questions that shipped with the game.
+- Once you have saved edits, they are what the game uses. A newer `questions/quiz.json` uploaded to GitHub will not
+  replace them unless you press "Back to the original questions" first.
+
 ## Adding the logo and celebrity pictures (the easy way)
 Open `https://YOUR-SITE.netlify.app/images` (there is also a button for it in the host's lobby) and enter the admin PIN.
 The page lists all 38 pictures with the name each one must show (20 logos, 18 celebrities).

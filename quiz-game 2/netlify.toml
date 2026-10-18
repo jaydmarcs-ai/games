@@ -13,3 +13,9 @@
   from = "/images"
   to = "/images.html"
   status = 200
+
+# The host's question editor lives at /questions
+[[redirects]]
+  from = "/questions"
+  to = "/questions.html"
+  status = 200

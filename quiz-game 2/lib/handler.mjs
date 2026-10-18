@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { HttpError, newGame, normalize, tick, view, join, leave, answer, pickByTeam, admin, IMAGE_SLOTS, IMAGE_SLOT_SET } from './game.mjs';
+import { HttpError, newGame, normalize, tick, view, join, leave, answer, pickByTeam, admin, IMAGE_SLOTS, IMAGE_SLOT_SET, setQuiz, compileQuiz, DEFAULT_QUIZ, TOTAL_QUESTIONS } from './game.mjs';
 
 const HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 // The kinds of picture the host can upload, each with a check on the file's first bytes.
@@ -14,7 +14,8 @@ const json = (status, obj) => new Response(JSON.stringify(obj), { status, header
 
 /**
  * store: { load(): Promise<{data, etag}|null>, save(data, etag|null): Promise<{modified?:boolean}> }
- * opts:  { adminPin, adminName, now(), images }
+ * opts:  { adminPin, adminName, now(), images, quiz }
+ *   quiz (optional): { load(fresh) -> quiz|null, save(quiz), clear() }: questions edited on the host's question page
  *   images (optional): { get(slot) -> {data, contentType}|null, put(slot, bytes, contentType), del(slot), list() -> [slot] }
  */
 export function makeHandler(store, opts) {
@@ -52,6 +53,38 @@ export function makeHandler(store, opts) {
     return { ...view(g, t, who), adminName: opts.adminName };
   }
 
+  // The questions the game uses: the host's edited set if there is one, otherwise the original.
+  // Reads are cached for a few seconds by the store; anything that changes the game asks for a fresh copy.
+  async function useQuiz(fresh) {
+    if (!opts.quiz) { setQuiz(DEFAULT_QUIZ); return; }
+    let saved = null;
+    try { saved = await opts.quiz.load(fresh); } catch (e) { console.error('Could not read the edited questions:', e); }
+    try { setQuiz(saved || DEFAULT_QUIZ); }
+    catch (e) { console.error('The saved questions are not valid, using the original ones:', e.message); setQuiz(DEFAULT_QUIZ); }
+  }
+
+  // The host's question page: read the questions, save an edited set, go back to the original set.
+  async function questions(action, body) {
+    if (!opts.quiz) throw new HttpError(501, 'Question editing is not available here.');
+    const cur = await store.load();
+    const phase = cur ? cur.data.phase || 'lobby' : 'lobby';
+    const running = !['lobby', 'final'].includes(phase);
+    if (action === 'quizget') {
+      const saved = await opts.quiz.load(true);
+      return { quiz: saved || DEFAULT_QUIZ, custom: Boolean(saved), running, phase, original: DEFAULT_QUIZ };
+    }
+    if (running) throw new HttpError(409, 'A game is running. Questions can only be changed between games: finish the game (End game), or clear it, then save again.');
+    if (action === 'quizreset') { await opts.quiz.clear(); setQuiz(DEFAULT_QUIZ); return { ok: true }; }
+    // quizput
+    const text = JSON.stringify(body.quiz ?? null);
+    if (text.length > 600000) throw new HttpError(413, 'That is too much to save at once.');
+    const quiz = JSON.parse(text);
+    try { compileQuiz(quiz); } catch (e) { throw new HttpError(400, e.message); }
+    await opts.quiz.save(quiz);
+    setQuiz(quiz);
+    return { ok: true, total: TOTAL_QUESTIONS };
+  }
+
   // The host's picture page: list the slots, upload a picture, remove a picture.
   async function pictures(action, body) {
     if (!opts.images) throw new HttpError(501, 'Picture uploads are not available here.');
@@ -79,6 +112,8 @@ export function makeHandler(store, opts) {
       }
       const url = new URL(req.url);
       const route = url.pathname.replace(/^\/api\/?/, '');
+      // Anything that changes the game, or the editor itself, reads the questions fresh; state polls may use a copy a few seconds old.
+      await useQuiz(req.method === 'POST');
 
       if (req.method === 'GET' && route === 'state') return json(200, await readState(url));
 
@@ -106,6 +141,7 @@ export function makeHandler(store, opts) {
         const action = route.slice('admin/'.length);
         if (action === 'check') return json(200, { ok: true });
         if (['slots', 'imageput', 'imagedelete'].includes(action)) return json(200, await pictures(action, body));
+        if (['quizget', 'quizput', 'quizreset'].includes(action)) return json(200, await questions(action, body));
         const { out } = await mutate((g, t) => admin(g, action, body, t));
         return json(200, out);
       }

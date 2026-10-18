@@ -292,3 +292,48 @@ body.host .qv.hasimg .imgcard { margin: 0 auto; }
 
 .slotcard { min-width: 0; }
 .cropprev { overflow: hidden; }
+
+/* ---------- Question editor (/questions) ---------- */
+.savebar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; padding: 10px 3vw; background: rgba(21, 19, 31, .96); border-bottom: 1px solid var(--haze2); }
+.savebar .sb-left { display: grid; }
+.savebar #dirty { color: var(--mute); font-size: .85em; }
+.savebar .sb-right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.edpage { max-width: 1000px; margin: 0 auto; padding: 1.4vw 3vw 80px; }
+.edpage h1 { font-size: 1.8em; font-weight: 900; margin: .2em 0 .4em; }
+.edpage h2 { font-size: 1.3em; margin: 1.4em 0 .4em; }
+.edpage .note { color: var(--mute); margin: .2em 0 .8em; font-size: .9em; }
+.edpage .lead { margin: .2em 0 .4em; font-weight: 700; }
+.edpage .warn { color: var(--spot); font-weight: 700; margin: .2em 0; }
+.edpage code { background: var(--haze2); padding: 1px 6px; border-radius: 6px; }
+.lock { background: var(--haze); border: 2px solid var(--spot); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-weight: 700; }
+.errbox { background: #3a1626; border: 2px solid var(--cue); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-weight: 700; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+.tab { border: 2px solid var(--haze2); background: var(--haze); color: var(--paper); border-radius: 999px; padding: .5em 1em; font-weight: 800; cursor: pointer; }
+.tab.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.fl { display: grid; gap: 4px; font-weight: 700; font-size: .9em; color: var(--mute); }
+.fl input, .fl textarea, .fl select, .pool, .edpage select { font: inherit; color: var(--paper); background: var(--haze); border: 2px solid var(--haze2); border-radius: 10px; padding: .55em .7em; width: 100%; }
+.fl.grow { flex: 1; min-width: 160px; }
+.fl.small { max-width: 220px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.rfields { display: grid; gap: 10px; background: var(--haze); padding: 14px; border-radius: 14px; margin-bottom: 8px; }
+.rfields .fl input, .rfields .fl textarea { background: var(--ink); }
+.qlist { display: grid; gap: 12px; margin-bottom: 12px; }
+.qcard { background: var(--haze); border-radius: 14px; padding: 12px; display: grid; gap: 8px; }
+.qhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qhead select { width: auto; }
+.qhead .btn { margin-left: auto; }
+.qn { background: var(--haze2); border-radius: 6px; padding: 1px 9px; font-weight: 900; color: var(--mute); }
+.hint2 { color: var(--mute); font-size: .85em; }
+.optrow { display: flex; gap: 10px; align-items: center; }
+.optrow input[type=radio] { width: 1.4em; height: 1.4em; accent-color: var(--aqua); flex: none; }
+.optrow input:not([type=radio]) { flex: 1; font: inherit; color: var(--paper); background: var(--ink); border: 2px solid var(--haze2); border-radius: 10px; padding: .5em .7em; }
+.qcard .fl input { background: var(--ink); }
+.catbox { background: var(--ink); border: 2px solid var(--haze2); border-radius: 16px; padding: 14px; margin: 14px 0; }
+.cathead { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.items { display: grid; gap: 8px; margin-bottom: 10px; }
+.itemrow { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; background: var(--haze); border-radius: 12px; padding: 10px; }
+.itemrow .slot { background: var(--haze2); border-radius: 6px; padding: 4px 8px; font-weight: 900; color: var(--mute); align-self: center; }
+.itemrow .fl input, .itemrow .fl select { background: var(--ink); }
+.pool { min-height: 8em; }
+.nopic { color: #555; font-weight: 700; padding: 8px; text-align: center; }
+.edbody .top a { color: var(--paper); }

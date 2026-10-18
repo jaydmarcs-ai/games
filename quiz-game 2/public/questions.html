@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Quiz: Questions</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="host edbody">
+<div id="conn" class="conn" hidden>Reconnecting…</div>
+<div id="app"></div>
+<div id="toast" class="toast" hidden style="bottom:24px"></div>
+<script src="/shared.js"></script>
+<script>
+// The host's question editor. The page keeps a working copy of the quiz; "Save changes" checks it and
+// replaces the questions the game uses. Nothing changes in the game until then.
+let KEY = sessionStorage.getItem('quizKey') || '';
+let quiz = null;          // working copy (everything typed into a box is kept as text until saving)
+let baseline = '';        // the working copy as last loaded or saved, to tell what has changed
+let info = {};            // { custom, running, phase }
+let tab = 0, message = '', toastTimer;
+const app = $('#app');
+const CROP_CHOICES = ['', 'eyes', 'smile', 'half-left', 'half-right'];
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 6000);
+}
+const api = (action, body) => post('/api/admin/' + action, body, { 'x-admin-key': KEY });
+const getP = (o, path) => path.split('.').reduce((x, k) => x[k], o);
+function setP(o, path, v) { const ks = path.split('.'); const last = ks.pop(); ks.reduce((x, k) => x[k], o)[last] = v; }
+
+// ---------- Sign-in ----------
+function gate(msg) {
+  app.innerHTML = `<main class="gate"><h1>Host sign-in</h1><p>Enter the admin PIN to edit the questions.</p>
+    <form id="gf"><input id="pin" inputmode="numeric" autocomplete="off" placeholder="Admin PIN" autofocus>
+    <button class="btn go">Continue</button></form><p class="err">${esc(msg || '')}</p></main>`;
+  $('#gf').onsubmit = async (e) => {
+    e.preventDefault();
+    KEY = $('#pin').value.trim();
+    try { await load(); sessionStorage.setItem('quizKey', KEY); } catch (err) { gate(err.message); }
+  };
+}
+
+// ---------- Working copy <-> the real quiz ----------
+const pad4 = (o) => { const a = [...o]; while (a.length < 4) a.push(''); return a; };
+const str = (v) => (v === undefined || v === null ? '' : String(v));
+function workingQ(q) {
+  if (q.type === 'number') return { ...q, answer: str(q.answer), tolerance: str(q.tolerance), seconds: str(q.seconds) };
+  return { ...q, options: pad4(q.options), seconds: str(q.seconds) };
+}
+function toWorking(src) {
+  const w = JSON.parse(JSON.stringify(src));
+  for (const r of w.rounds) {
+    for (const k of ['seconds', 'pickSeconds', 'perTeam', 'breakAfterMinutes']) r[k] = str(r[k]);
+    r.blurb = str(r.blurb); r.prompt = str(r.prompt);
+    if (r.questions) r.questions = r.questions.map(workingQ);
+    for (const c of r.categories || []) c.questions = c.questions.map(workingQ);
+    if (r.items) {
+      r.items = r.items.map((i) => ({ ...i, group: str(i.group) }));
+      r.poolText = (r.pool || []).map((p) => (p.group ? `${p.name} | ${p.group}` : p.name)).join('\n');
+    }
+  }
+  return w;
+}
+
+function num(v, where, what, min, max, whole) {
+  const t = str(v).trim();
+  if (t === '') return undefined;
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < min || n > max || (whole && !Number.isInteger(n))) throw new Error(`${where}: ${what} must be ${whole ? 'a whole number' : 'a number'} from ${min} to ${max}.`);
+  return n;
+}
+function cleanQ(q, where) {
+  const out = { ...q };
+  out.text = str(q.text).trim();
+  if (!out.text) throw new Error(`${where}: type the question.`);
+  const secs = num(q.seconds, where, 'the time', 3, 300, true);
+  if (secs === undefined) delete out.seconds; else out.seconds = secs;
+  if (q.type === 'number') {
+    const a = str(q.answer).replace(/[\s,]/g, '');
+    out.answer = a === '' ? null : Number(a);
+    if (a !== '' && !Number.isFinite(out.answer)) throw new Error(`${where}: the answer must be a number (or left blank to type it live).`);
+    const t = num(q.tolerance, where, '"counts if within"', 0, 1000000, false);
+    if (t === undefined) delete out.tolerance; else out.tolerance = t;
+    delete out.options; delete out.correct;
+  } else {
+    delete out.type;
+    const opts = []; let correct = -1;
+    q.options.forEach((o, i) => { const v = str(o).trim(); if (v) { if (i === Number(q.correct)) correct = opts.length; opts.push(v); } });
+    if (opts.length < 2) throw new Error(`${where}: give at least 2 answers.`);
+    if (correct < 0) throw new Error(`${where}: mark the right answer with the round button (and fill that answer in).`);
+    out.options = opts; out.correct = correct;
+  }
+  return out;
+}
+function clean(w) {
+  const out = JSON.parse(JSON.stringify(w));
+  out.rounds.forEach((r, ri) => {
+    const where = `Round ${ri + 1}`;
+    r.title = str(r.title).trim();
+    if (!r.title) throw new Error(`${where}: type a title.`);
+    r.blurb = str(r.blurb).trim(); if (!r.blurb) delete r.blurb;
+    r.prompt = str(r.prompt).trim(); if (!r.prompt) delete r.prompt;
+    for (const [k, label, min, max] of [['seconds', 'the time per question', 3, 300], ['pickSeconds', 'the choosing time', 3, 300], ['perTeam', 'questions per team', 1, 50], ['breakAfterMinutes', 'the break', 1, 240]]) {
+      const v = num(r[k], `${where}`, label, min, max, true);
+      if (v === undefined) delete r[k]; else r[k] = v;
+    }
+    if (r.questions) r.questions = r.questions.map((q, i) => cleanQ(q, `${r.title}, question ${i + 1}`));
+    for (const c of r.categories || []) {
+      c.name = str(c.name).trim();
+      if (!c.name) throw new Error(`${r.title}: every category needs a name.`);
+      c.questions = c.questions.map((q, i) => cleanQ(q, `${r.title}, ${c.name}, question ${i + 1}`));
+    }
+    if (r.items) {
+      r.items = r.items.map((it, i) => {
+        const o = { ...it };
+        o.answer = str(it.answer).trim();
+        if (!o.answer) throw new Error(`${r.title}, picture ${i + 1}: type the name that goes with it.`);
+        o.group = str(it.group).trim(); if (!o.group) delete o.group;
+        if (!o.crop) delete o.crop;
+        return o;
+      });
+      r.pool = str(r.poolText).split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
+        const [name, group] = l.split('|').map((x) => x.trim());
+        return group ? { name, group } : { name };
+      });
+      if (!r.pool.length) delete r.pool;
+      delete r.poolText;
+    }
+  });
+  return out;
+}
+
+// ---------- Numbers shown at the top ----------
+function claimPer(r) {
+  const sizes = r.categories.map((c) => c.questions.length);
+  const p = Number(r.perTeam) > 0 ? Number(r.perTeam) : Infinity;
+  return Math.min(p, ...sizes);
+}
+const roundCount = (r) => (r.categories
+  ? (r.perTeam !== undefined && r.kind === 'claim' ? Math.min(r.categories.length, 8) * claimPer(r) : r.categories.reduce((n, c) => n + c.questions.length, 0))
+  : r.items ? r.items.length : r.questions.length);
+function summary() {
+  const parts = quiz.rounds.map((r, i) => {
+    if (r.kind === 'claim') return `Round ${i + 1}: ${r.categories.length} categories x ${claimPer(r)} = ${roundCount(r)}`;
+    return `Round ${i + 1}: ${roundCount(r)}`;
+  });
+  const total = quiz.rounds.reduce((n, r) => n + roundCount(r), 0);
+  const warns = [];
+  for (const [i, r] of quiz.rounds.entries()) {
+    if (r.kind === 'claim') for (const c of r.categories) if (Number(r.perTeam) > c.questions.length) warns.push(`${c.name} has only ${c.questions.length} question${c.questions.length === 1 ? '' : 's'}, so every team will play ${claimPer(r)} instead of ${r.perTeam}.`);
+    if (r.items) { const names = new Set([...r.items.map((x) => str(x.answer).trim()), ...str(r.poolText).split('\n').map((l) => l.split('|')[0].trim())].filter(Boolean)); if (names.size < 4) warns.push(`Round ${i + 1} needs at least 4 different names (pictures plus extra wrong answers).`); }
+  }
+  return { text: `${total} questions in all. ${parts.join(', ')}.`, warns };
+}
+
+// ---------- Drawing ----------
+function opt(path, i, q) {
+  const name = 'c' + path.replace(/\./g, '-');
+  return `<label class="optrow"><input type="radio" name="${name}" data-p="${path}.correct" value="${i}" ${Number(q.correct) === i ? 'checked' : ''} aria-label="This is the right answer">
+    <input data-p="${path}.options.${i}" value="${esc(q.options[i])}" placeholder="Answer ${'ABCD'[i]}${i > 1 ? ' (optional)' : ''}"></label>`;
+}
+function qcard(path, q, n) {
+  const isNum = q.type === 'number';
+  return `<div class="qcard">
+    <div class="qhead"><span class="qn">${n}</span>
+      <select data-act="qtype" data-path="${path}" aria-label="Kind of question"><option value="mc" ${isNum ? '' : 'selected'}>Multiple choice</option><option value="number" ${isNum ? 'selected' : ''}>Typed number</option></select>
+      <button class="btn small ghost" data-act="delq" data-path="${path}">Delete</button></div>
+    <label class="fl">Question<input data-p="${path}.text" value="${esc(q.text)}" placeholder="Type the question"></label>
+    ${isNum
+      ? `<div class="two"><label class="fl">Right answer (leave blank to type it live)<input data-p="${path}.answer" inputmode="decimal" value="${esc(q.answer)}" placeholder="e.g. 14"></label>
+         <label class="fl">Counts if within<input data-p="${path}.tolerance" inputmode="decimal" value="${esc(q.tolerance)}" placeholder="0 = exact"></label></div>`
+      : `<p class="hint2">Fill in 2 to 4 answers and tap the round button next to the right one.</p>${[0, 1, 2, 3].map((i) => opt(path, i, q)).join('')}`}
+    <label class="fl small">Seconds to answer (optional)<input data-p="${path}.seconds" inputmode="numeric" value="${esc(q.seconds)}" placeholder="round default"></label>
+  </div>`;
+}
+function qlist(path, list) {
+  return `<div class="qlist">${list.map((q, i) => qcard(`${path}.${i}`, q, i + 1)).join('')}</div>
+    <button class="btn small go" data-act="addq" data-path="${path}">Add a question</button>`;
+}
+function roundFields(r, ri) {
+  const last = ri === quiz.rounds.length - 1;
+  return `<div class="rfields">
+    <label class="fl">Round title<input data-p="rounds.${ri}.title" value="${esc(r.title)}"></label>
+    <label class="fl">Short intro shown on the screen<textarea data-p="rounds.${ri}.blurb" rows="2">${esc(r.blurb)}</textarea></label>
+    <div class="two">
+      <label class="fl">Seconds per question<input data-p="rounds.${ri}.seconds" inputmode="numeric" value="${esc(r.seconds)}" placeholder="20"></label>
+      ${r.kind === 'claim' ? `<label class="fl">Questions each team plays<input data-p="rounds.${ri}.perTeam" inputmode="numeric" value="${esc(r.perTeam)}" placeholder="all"></label>` : ''}
+      ${r.kind === 'claim' || r.kind === 'pick' ? `<label class="fl">Seconds to choose a category<input data-p="rounds.${ri}.pickSeconds" inputmode="numeric" value="${esc(r.pickSeconds)}" placeholder="15"></label>` : ''}
+      ${last ? '' : `<label class="fl">Break after this round (minutes)<input data-p="rounds.${ri}.breakAfterMinutes" inputmode="numeric" value="${esc(r.breakAfterMinutes)}" placeholder="no break"></label>`}
+    </div>
+    ${r.kind === 'image' ? `<label class="fl">Question shown above each picture<input data-p="rounds.${ri}.prompt" value="${esc(r.prompt)}"></label>` : ''}
+  </div>`;
+}
+function panel() {
+  const r = quiz.rounds[tab], ri = tab;
+  let body = '';
+  if (r.kind === 'standard') {
+    body = `<h2>Questions</h2>${qlist(`rounds.${ri}.questions`, r.questions)}`;
+  } else if (r.kind === 'claim' || r.kind === 'pick') {
+    body = `<h2>Categories</h2><p class="note">With a team playing alone in each category, you need at least as many categories as teams (up to 8).</p>` + r.categories.map((c, ci) => `
+      <section class="catbox" id="cat-${esc(c.id)}">
+        <div class="cathead"><label class="fl grow">Category name<input data-p="rounds.${ri}.categories.${ci}.name" value="${esc(c.name)}"></label>
+          <button class="btn small ghost" data-act="delcat" data-ri="${ri}" data-ci="${ci}">Delete category</button></div>
+        <p class="note">${c.questions.length} question${c.questions.length === 1 ? '' : 's'}${Number(r.perTeam) > 0 ? `. Each team that picks it plays ${Math.min(Number(r.perTeam), c.questions.length)}, chosen at random.` : ''}</p>
+        ${qlist(`rounds.${ri}.categories.${ci}.questions`, c.questions)}
+      </section>`).join('') + `<button class="btn go" data-act="addcat" data-ri="${ri}">Add a category</button>`;
+  } else {
+    const cropped = r.items.some((i) => i.crop) || r.crop;
+    body = `<h2>Pictures</h2><p class="note">Each picture needs its name here, then its image on the <a href="/images">Pictures page</a>. The wrong answers come from the other names (and the extra names below), preferring the same "group".</p>
+      <div class="items">${r.items.map((it, ii) => `
+        <div class="itemrow"><span class="slot">${esc(it.image)}</span>
+          <label class="fl grow">Name<input data-p="rounds.${ri}.items.${ii}.answer" value="${esc(it.answer)}"></label>
+          <label class="fl">Group<input data-p="rounds.${ri}.items.${ii}.group" value="${esc(it.group)}" placeholder="optional"></label>
+          ${cropped ? `<label class="fl">Shown as<select data-p="rounds.${ri}.items.${ii}.crop">${CROP_CHOICES.map((c) => `<option value="${c}" ${it.crop === c || (!it.crop && !c) ? 'selected' : ''}>${c || 'whole picture'}</option>`).join('')}${it.crop && typeof it.crop === 'object' ? '<option value="" disabled selected>custom area</option>' : ''}</select></label>` : ''}
+          <button class="btn small ghost" data-act="delitem" data-ri="${ri}" data-ii="${ii}">Remove</button></div>`).join('')}</div>
+      <button class="btn small go" data-act="additem" data-ri="${ri}">Add a picture</button>
+      <h2>Extra wrong answers</h2><p class="note">Other names to use as wrong options. One per line. You can add a group after a bar, like <code>Airtel | telecom</code>.</p>
+      <textarea class="pool" data-p="rounds.${ri}.poolText" rows="8">${esc(r.poolText)}</textarea>`;
+  }
+  return `<section class="rpanel"><h1>Round ${ri + 1}</h1>${roundFields(r, ri)}${body}</section>`;
+}
+function header() {
+  const s = summary();
+  return `<header class="top"><span class="brand">Guess the Quiz</span><span>Questions</span><a href="/host">Back to the host screen</a></header>
+  <div class="savebar">
+    <div class="sb-left"><b id="status">${info.custom ? 'Using your edited questions' : 'Using the original questions'}</b>
+      <span id="dirty"></span></div>
+    <div class="sb-right">
+      <button class="btn go" id="save" data-act="save">Save changes</button>
+      <button class="btn small ghost" data-act="backup">Download a backup</button>
+      <label class="btn small ghost">Load from a file<input type="file" accept=".json,application/json" hidden id="loadfile"></label>
+      <button class="btn small ghost" data-act="reset" ${info.custom ? '' : 'disabled'}>Back to the original questions</button>
+    </div></div>
+  <main class="edpage">
+    ${info.running ? `<div class="lock">A game is running (${esc(info.phase)}). You can look and prepare changes, but saving is locked until the game is finished (End game) or cleared.</div>` : ''}
+    <div id="msg" class="errbox" ${message ? '' : 'hidden'}>${esc(message)}</div>
+    <p class="lead" id="summary">${esc(s.text)}</p><div id="warns">${s.warns.map((w) => `<p class="warn">${esc(w)}</p>`).join('')}</div>
+    <nav class="tabs">${quiz.rounds.map((r, i) => `<button class="tab ${i === tab ? 'on' : ''}" data-act="tab" data-ri="${i}">Round ${i + 1}: ${esc(r.title)}</button>`).join('')}</nav>
+    <div id="panel">${panel()}</div>
+  </main>`;
+}
+function render(keepScroll) {
+  const y = window.scrollY;
+  app.innerHTML = header();
+  wireFile();
+  updateDirty();
+  if (keepScroll) window.scrollTo(0, y);
+}
+const isDirty = () => JSON.stringify(quiz) !== baseline;
+function updateDirty() {
+  const d = isDirty();
+  const el = $('#dirty'); if (el) el.textContent = d ? 'You have unsaved changes.' : 'Everything is saved.';
+  const sv = $('#save'); if (sv) sv.disabled = !d || info.running;
+  const s = summary();
+  if ($('#summary')) { $('#summary').textContent = s.text; $('#warns').innerHTML = s.warns.map((w) => `<p class="warn">${esc(w)}</p>`).join(''); }
+}
+function say(msg) { message = msg || ''; const m = $('#msg'); if (m) { m.hidden = !message; m.textContent = message; } }
+
+// ---------- Actions ----------
+const defaultQ = () => ({ text: '', options: ['', '', '', ''], correct: 0, seconds: '' });
+let idCounter = 0;
+const uniqueId = (name, r) => {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'category';
+  let id = base; while (r.categories.some((c) => c.id === id)) id = `${base}-${++idCounter}`; return id;
+};
+
+const ACTS = {
+  tab: (b) => { tab = Number(b.dataset.ri); render(); window.scrollTo(0, 0); },
+  addq: (b) => { getP(quiz, b.dataset.path).push(defaultQ()); render(true); const cards = document.querySelectorAll('.qcard'); const last = [...cards].pop(); if (last) { last.scrollIntoView({ block: 'center' }); last.querySelector('input').focus(); } },
+  delq: (b) => { const list = getP(quiz, b.dataset.path.replace(/\.\d+$/, '')); const i = Number(b.dataset.path.split('.').pop()); if (!confirm('Delete this question?')) return; list.splice(i, 1); render(true); },
+  addcat: (b) => { const r = quiz.rounds[Number(b.dataset.ri)]; r.categories.push({ id: uniqueId('New category', r), name: 'New category', questions: [defaultQ()] }); render(); const boxes = document.querySelectorAll('.catbox'); const el = boxes[boxes.length - 1]; if (el) { el.scrollIntoView({ block: 'start' }); el.querySelector('input').select(); } },
+  delcat: (b) => { const r = quiz.rounds[Number(b.dataset.ri)]; const c = r.categories[Number(b.dataset.ci)]; if (!confirm(`Delete the ${c.name} category and its ${c.questions.length} questions?`)) return; r.categories.splice(Number(b.dataset.ci), 1); render(true); },
+  additem: (b) => {
+    const r = quiz.rounds[Number(b.dataset.ri)];
+    const nums = r.items.map((i) => Number(String(i.image).split('/')[1]) || 0);
+    const prefix = r.items.length ? String(r.items[0].image).split('/')[0] : r.id;
+    r.items.push({ image: `${prefix}/${String(Math.max(0, ...nums) + 1).padStart(2, '0')}`, answer: '', group: '' });
+    render(true); const rows = document.querySelectorAll('.itemrow'); const last = rows[rows.length - 1]; if (last) { last.scrollIntoView({ block: 'center' }); last.querySelector('input').focus(); }
+  },
+  delitem: (b) => { const r = quiz.rounds[Number(b.dataset.ri)]; const it = r.items[Number(b.dataset.ii)]; if (!confirm(`Remove ${it.answer || it.image}? (Its uploaded picture stays stored but is no longer used.)`)) return; r.items.splice(Number(b.dataset.ii), 1); render(true); },
+  save: async () => {
+    say('');
+    let out;
+    try { out = clean(quiz); } catch (e) { say(e.message); toast(e.message); window.scrollTo(0, 0); return; }
+    try {
+      const r = await api('quizput', { quiz: out });
+      baseline = JSON.stringify(quiz); info.custom = true;
+      render(true); toast(`Saved. The game now uses these questions (${r.total} in all).`);
+    } catch (e) { say(e.message); toast(e.message); window.scrollTo(0, 0); }
+  },
+  reset: async () => {
+    if (!confirm('Throw away all your changes and go back to the original questions that came with the game?')) return;
+    try { await api('quizreset'); await load(); toast('Back to the original questions.'); } catch (e) { say(e.message); toast(e.message); }
+  },
+  backup: () => {
+    let data; try { data = clean(quiz); } catch (e) { data = quiz; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+    a.download = `quiz-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+  },
+};
+
+function wireFile() {
+  const f = $('#loadfile');
+  if (!f) return;
+  f.onchange = async () => {
+    if (!f.files[0]) return;
+    try {
+      const parsed = JSON.parse(await f.files[0].text());
+      if (!parsed || !Array.isArray(parsed.rounds)) throw new Error('That file is not a quiz backup.');
+      quiz = toWorking(parsed); tab = 0; render();
+      toast('Loaded from the file. Press Save changes to use it.');
+    } catch (e) { say(e.message || 'Could not read that file.'); toast(e.message || 'Could not read that file.'); }
+  };
+}
+
+app.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.tagName === 'SELECT' || b.disabled) return;
+  const fn = ACTS[b.dataset.act];
+  if (fn) fn(b);
+});
+app.addEventListener('input', (e) => {
+  const p = e.target.dataset && e.target.dataset.p;
+  if (!p) return;
+  setP(quiz, p, e.target.type === 'radio' ? Number(e.target.value) : e.target.value);
+  updateDirty();
+});
+app.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.act === 'qtype') {
+    const path = el.dataset.path, q = getP(quiz, path);
+    setP(quiz, path, el.value === 'number'
+      ? { type: 'number', text: q.text, answer: '', tolerance: '', seconds: q.seconds || '' }
+      : { text: q.text, options: ['', '', '', ''], correct: 0, seconds: q.seconds || '' });
+    render(true);
+  }
+});
+window.addEventListener('beforeunload', (e) => { if (quiz && isDirty() && !info.running) { e.preventDefault(); e.returnValue = ''; } });
+
+async function load() {
+  const r = await api('quizget');
+  info = { custom: r.custom, running: r.running, phase: r.phase };
+  quiz = toWorking(r.quiz);
+  baseline = JSON.stringify(quiz);
+  if (tab >= quiz.rounds.length) tab = 0;
+  render();
+}
+if (KEY) load().catch(() => { KEY = ''; sessionStorage.removeItem('quizKey'); gate(); });
+else gate();
+</script>
+</body>
+</html>

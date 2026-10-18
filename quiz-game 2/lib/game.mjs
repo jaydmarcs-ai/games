@@ -27,62 +27,84 @@ function cropOk(c) {
 }
 
 // ---------- Question bank ----------
-export const ROUNDS = QUIZ.rounds;
+// The quiz content (rounds, questions, answers) can be changed from the host's question editor, so it is
+// not fixed when this file loads: setQuiz() swaps it in. questions/quiz.json is the original.
+export const DEFAULT_QUIZ = QUIZ;
 
 function checkQuestion(q, where) {
   if (q && q.type === 'number') {
-    // Typed answer. "answer": null means "not filled in yet": the question is skipped until it has one.
-    const ok = typeof q.text === 'string' &&
+    // Typed answer. "answer": null means "not saved yet": the host types the correct number live.
+    const ok = typeof q.text === 'string' && q.text.trim() !== '' &&
       (q.answer === null || (typeof q.answer === 'number' && Number.isFinite(q.answer))) &&
       (q.tolerance === undefined || (typeof q.tolerance === 'number' && q.tolerance >= 0));
-    if (!ok) throw new Error(`${where} is invalid: a "number" question needs "text" and an "answer" (a number, or null until you know it).`);
+    if (!ok) throw new Error(`${where}: a typed-number question needs its text, and an answer that is a number (or blank).`);
     return;
   }
-  const ok =
-    q && typeof q.text === 'string' && Array.isArray(q.options) &&
-    q.options.length >= 2 && q.options.length <= 4 &&
-    q.options.every((o) => typeof o === 'string') &&
+  if (!q || typeof q.text !== 'string' || q.text.trim() === '') throw new Error(`${where}: the question has no text.`);
+  const ok = Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 4 &&
+    q.options.every((o) => typeof o === 'string' && o.trim() !== '') &&
     Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.options.length;
-  if (!ok) throw new Error(`${where} is invalid: needs "text", 2-4 "options", and a "correct" index.`);
+  if (!ok) throw new Error(`${where}: needs 2 to 4 answers, with the right one marked.`);
 }
 
-if (!Array.isArray(ROUNDS) || !ROUNDS.length) throw new Error('quiz.json needs a "rounds" list.');
-ROUNDS.forEach((r, ri) => {
-  const w = `Round ${ri + 1}`;
-  if (!['standard', 'pick', 'claim', 'image'].includes(r.kind)) throw new Error(`${w}: "kind" must be standard, pick, claim or image.`);
-  if (r.kind === 'standard') {
-    if (!r.questions?.length) throw new Error(`${w} has no questions.`);
-    r.questions.forEach((q, i) => checkQuestion(q, `${w}, question ${i + 1}`));
-  } else if (r.kind === 'pick' || r.kind === 'claim') {
-    if (!r.categories?.length) throw new Error(`${w} has no categories.`);
-    r.categories.forEach((c) => {
-      if (!c.id || !c.name || !c.questions?.length) throw new Error(`${w}: each category needs id, name and questions.`);
-      c.questions.forEach((q, i) => checkQuestion(q, `${w}, ${c.name} question ${i + 1}`));
-    });
-  } else {
-    if (!r.items?.length) throw new Error(`${w} has no items.`);
-    const names = new Set([...r.items.map((i) => i.answer), ...(r.pool || []).map((p) => p.name)]);
-    if (names.size < (r.optionCount || 4)) throw new Error(`${w}: needs at least ${r.optionCount || 4} different names across items and pool.`);
-    r.items.forEach((it, i) => { if (!it.image || !it.answer) throw new Error(`${w}, item ${i + 1} needs "image" and "answer".`); });
-    const badCrop = `"crop" must be one of ${CROP_PRESETS.join(', ')}, or { "x", "y", "w", "h" } as fractions between 0 and 1`;
-    if (!cropOk(r.crop)) throw new Error(`${w}: ${badCrop}.`);
-    r.items.forEach((it, i) => { if (!cropOk(it.crop)) throw new Error(`${w}, item ${i + 1}: ${badCrop}.`); });
+// Checks a quiz and works out everything that is derived from it. Throws an Error with a plain
+// message if something is wrong. Nothing is changed unless the quiz passes.
+export function compileQuiz(input) {
+  const rounds = input && Array.isArray(input.rounds) ? structuredClone(input.rounds) : null;
+  if (!rounds || !rounds.length) throw new Error('The quiz needs at least one round.');
+  rounds.forEach((r, ri) => {
+    const w = `Round ${ri + 1}`;
+    if (typeof r.title !== 'string' || !r.title.trim()) throw new Error(`${w} needs a title.`);
+    if (!['standard', 'pick', 'claim', 'image'].includes(r.kind)) throw new Error(`${w}: unknown kind of round.`);
+    if (r.kind === 'standard') {
+      if (!r.questions?.length) throw new Error(`${w} has no questions.`);
+      r.questions.forEach((q, i) => checkQuestion(q, `${w}, question ${i + 1}`));
+    } else if (r.kind === 'pick' || r.kind === 'claim') {
+      if (!r.categories?.length) throw new Error(`${w} has no categories.`);
+      const ids = new Set();
+      r.categories.forEach((c) => {
+        if (!c.id || typeof c.name !== 'string' || !c.name.trim()) throw new Error(`${w}: every category needs a name.`);
+        if (ids.has(c.id)) throw new Error(`${w}: two categories share the id "${c.id}".`);
+        ids.add(c.id);
+        if (!c.questions?.length) throw new Error(`${w}: the ${c.name} category has no questions.`);
+        c.questions.forEach((q, i) => checkQuestion(q, `${w}, ${c.name}, question ${i + 1}`));
+      });
+    } else {
+      if (!r.items?.length) throw new Error(`${w} has no pictures.`);
+      const names = new Set([...r.items.map((i) => i.answer), ...(r.pool || []).map((p) => p.name)]);
+      if (names.size < (r.optionCount || 4)) throw new Error(`${w}: needs at least ${r.optionCount || 4} different names across the pictures and the extra wrong answers.`);
+      const slots = new Set();
+      r.items.forEach((it, i) => {
+        if (!it.image || typeof it.answer !== 'string' || !it.answer.trim()) throw new Error(`${w}, picture ${i + 1} needs a name.`);
+        if (slots.has(it.image)) throw new Error(`${w}: two pictures use the slot ${it.image}.`);
+        slots.add(it.image);
+      });
+      const badCrop = `"crop" must be one of ${CROP_PRESETS.join(', ')}, or { "x", "y", "w", "h" } as fractions between 0 and 1`;
+      if (!cropOk(r.crop)) throw new Error(`${w}: ${badCrop}.`);
+      r.items.forEach((it, i) => { if (!cropOk(it.crop)) throw new Error(`${w}, picture ${i + 1}: ${badCrop}.`); });
+    }
+  });
+
+  // Typed-number questions with "answer": null have no saved answer. They are still asked; when one closes,
+  // the host types the correct number and the points are awarded then. The host's lobby lists them as a reminder.
+  const live = [];
+  for (const r of rounds) {
+    for (const q of r.questions || []) if (q.type === 'number' && q.answer === null) live.push(q.text);
+    for (const c of r.categories || []) for (const q of c.questions) if (q.type === 'number' && q.answer === null) live.push(q.text);
   }
-});
-
-// Typed-number questions with "answer": null have no saved answer. They are still asked; when one closes,
-// the host types the correct number and the points are awarded then. The host's lobby lists them as a reminder.
-export const LIVE_ANSWER_QUESTIONS = [];
-for (const r of ROUNDS) {
-  for (const q of r.questions || []) if (q.type === 'number' && q.answer === null) LIVE_ANSWER_QUESTIONS.push(q.text);
-  for (const c of r.categories || []) for (const q of c.questions) if (q.type === 'number' && q.answer === null) LIVE_ANSWER_QUESTIONS.push(q.text);
+  // Every picture the game can show: one slot per image question, like "logos/01". The host's picture
+  // page lists these (with the answer, so the host knows what to upload) and only these slots are accepted.
+  const slots = rounds.filter((r) => r.kind === 'image').flatMap((r) =>
+    r.items.map((it) => ({ slot: it.image, label: it.answer, round: r.title, crop: it.crop ?? r.crop ?? null })));
+  return { rounds, live, slots };
 }
 
-// Every picture the game can show: one slot per image question, like "logos/01". The host's picture
-// page lists these (with the answer, so the host knows what to upload) and only these slots are accepted.
-export const IMAGE_SLOTS = ROUNDS.filter((r) => r.kind === 'image').flatMap((r) =>
-  r.items.map((it) => ({ slot: it.image, label: it.answer, round: r.title, crop: it.crop ?? r.crop ?? null })));
-export const IMAGE_SLOT_SET = new Set(IMAGE_SLOTS.map((s) => s.slot));
+export let ROUNDS = [];
+export let LIVE_ANSWER_QUESTIONS = [];
+export let IMAGE_SLOTS = [];
+export let IMAGE_SLOT_SET = new Set();
+export let TOTAL_QUESTIONS = 0;
+let activeQuiz = null;
 
 // Claim rounds: each team that claims a category answers this many of its questions.
 const claimPer = (r) =>
@@ -95,7 +117,18 @@ export const roundTotal = (r) =>
 // How many questions this round will have in this game (claim rounds depend on the teams that claimed).
 const roundLen = (g, r) => (r.kind === 'claim' ? (g.turn ? g.turn.qs.length : claimPer(r)) : roundTotal(r));
 
-export const TOTAL_QUESTIONS = ROUNDS.reduce((n, r) => n + roundTotal(r), 0);
+// Makes this quiz the one the game uses. Throws (and changes nothing) if the quiz is not valid.
+export function setQuiz(input) {
+  if (input === activeQuiz) return;
+  const c = compileQuiz(input);
+  ROUNDS = c.rounds;
+  LIVE_ANSWER_QUESTIONS = c.live;
+  IMAGE_SLOTS = c.slots;
+  IMAGE_SLOT_SET = new Set(c.slots.map((x) => x.slot));
+  TOTAL_QUESTIONS = ROUNDS.reduce((n, r) => n + roundTotal(r), 0);
+  activeQuiz = input;
+}
+setQuiz(DEFAULT_QUIZ);
 
 function shuffle(a) {
   const x = [...a];
@@ -198,7 +231,7 @@ function ranked(g) {
 
 // ---------- What each screen is allowed to see ----------
 export function view(g, now, who = {}) {
-  const r = g.round >= 0 ? ROUNDS[g.round] : null;
+  const r = (g.round >= 0 && ROUNDS[g.round]) || null;   // (the questions can change between games)
   const showQ = g.cur && (g.phase === 'question' || g.phase === 'reveal');
   const list = ranked(g);
   const out = {

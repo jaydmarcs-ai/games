@@ -35,9 +35,25 @@ const images = {
   },
 };
 
+// Questions the host edited live in their own entry. Reads are cached for a few seconds (the screens ask
+// about once a second); saving, or asking for a fresh copy, skips the cache.
+const quizBlobs = () => getStore({ name: 'quiz-content', consistency: 'strong' });
+let quizCache = null, quizCachedAt = 0;
+const quiz = {
+  async load(fresh) {
+    if (!fresh && quizCachedAt && Date.now() - quizCachedAt < 5000) return quizCache;
+    quizCache = await quizBlobs().get('quiz', { type: 'json' });
+    quizCachedAt = Date.now();
+    return quizCache;
+  },
+  async save(q) { await quizBlobs().setJSON('quiz', q); quizCache = q; quizCachedAt = Date.now(); },
+  async clear() { await quizBlobs().delete('quiz'); quizCache = null; quizCachedAt = Date.now(); },
+};
+
 export default async (req) =>
   makeHandler(store, {
     images,
+    quiz,
     adminPin: process.env.ADMIN_PIN,
     adminName: process.env.ADMIN_NAME || 'Ibrahim',
   })(req);

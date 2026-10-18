@@ -90,7 +90,7 @@ function lobbyV() {
       <div class="url">${esc(location.host)}</div>
       <p class="hint">One phone per team. On that phone, enter the team name and up to ${S.teamSize} team members.</p>
       <p class="hint">${S.totalQuestions} questions in 4 rounds, with a break after round 2.</p>
-      <p class="hint"><a class="btn ghost" href="/images">Add the logo and celebrity pictures</a></p>
+      <p class="hint"><a class="btn ghost" href="/questions">Edit the questions</a> <a class="btn ghost" href="/images">Add the logo and celebrity pictures</a></p>
       ${S.liveAnswer && S.liveAnswer.length ? `<div class="notice"><b>${S.liveAnswer.length} typed-number question${S.liveAnswer.length === 1 ? ' has' : 's have'} no saved answer:</b>
         <ul>${S.liveAnswer.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
         <p>Teams will type their answers. When one of these closes, you type the correct number and the points are awarded. (To skip that step, put the number in questions/quiz.json instead of <code>"answer": null</code>.)</p></div>` : ''}

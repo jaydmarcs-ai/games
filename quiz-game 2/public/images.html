@@ -132,7 +132,7 @@ function card(s) {
   const face = s.slot.startsWith('faces/');
   const preview = s.uploaded
     ? `<img src="/api/image?slot=${encodeURIComponent(s.slot)}&t=${stamp[s.slot] || 0}" alt="${esc(s.label)}">`
-    : `<img class="ph" src="/img/${esc(s.slot)}.svg" alt="placeholder">`;
+    : `<img class="ph" src="/img/${esc(s.slot)}.svg" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'No picture yet',className:'nopic'}))">`;
   const crop = face && s.uploaded && s.crop
     ? `<div class="cropprev"><small>Shown as "${esc(typeof s.crop === 'string' ? s.crop : 'custom')}" while the question is open</small>${imgHTML(s.slot, s.crop, 0.12)}</div>` : '';
   return `<article class="slotcard" id="card-${esc(s.slot.replace('/', '-'))}">
