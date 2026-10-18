@@ -114,16 +114,54 @@ function tickBreak(S) {
 }
 function tickAll(S) { tickMeter(S); tickBreak(S); }
 
-// Question images live in /img/<name>.<ext>. Whatever format you upload (png, jpg, webp, svg) is found.
-const EXTS = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+// A question picture is looked for in this order: first one the host uploaded on the picture page,
+// then a file in /img/<name>.<ext> (png, jpg, webp or svg), which is also where the placeholders are.
+const EXTS = ['upload', 'png', 'jpg', 'jpeg', 'webp', 'svg'];
+const imgSrc = (base, ext) => (ext === 'upload' ? `/api/image?slot=${encodeURIComponent(base)}` : `/img/${base}.${ext}`);
 const IMG_OK = {};
-function imgHTML(base) {
+// Photo crops: while a question is open a photo can show only part of the picture.
+// Regions are fractions of the picture (x, y, width, height); presets assume a normal
+// head-and-shoulders portrait with the face roughly centred.
+const CROPS = {
+  eyes: { x: 0.14, y: 0.27, w: 0.72, h: 0.2 },
+  smile: { x: 0.24, y: 0.56, w: 0.52, h: 0.22 },
+  'half-left': { x: 0, y: 0.15, w: 0.5, h: 0.65 },
+  'half-right': { x: 0.5, y: 0.15, w: 0.5, h: 0.65 },
+};
+// crop: preset name or region, or null for the whole picture. maxH: biggest height as a fraction of the screen.
+function imgHTML(base, crop, maxH) {
   const e = IMG_OK[base] || EXTS[0];
-  return `<div class="imgcard"><img class="qimg" alt="Question image" src="/img/${esc(base)}.${e}" data-b="${esc(base)}" data-i="${Math.max(0, EXTS.indexOf(e))}" onerror="imgErr(this)" onload="IMG_OK[this.dataset.b]=EXTS[+this.dataset.i]"></div>`;
+  const c = crop ? ` data-crop="${esc(JSON.stringify(crop))}" data-maxh="${maxH || 0.4}"` : '';
+  return `<div class="imgcard"${c}><img class="qimg" alt="Question image" src="${esc(imgSrc(base, e))}" data-b="${esc(base)}" data-i="${Math.max(0, EXTS.indexOf(e))}" onerror="imgErr(this)" onload="IMG_OK[this.dataset.b]=EXTS[+this.dataset.i];applyCrop(this)"></div>`;
 }
+function applyCrop(img) {
+  const card = img.closest('.imgcard');
+  if (!card || !card.dataset.crop) return;
+  let spec; try { spec = JSON.parse(card.dataset.crop); } catch (e) { spec = null; }
+  const r = typeof spec === 'string' ? CROPS[spec] : spec;
+  const nw = img.naturalWidth, nh = img.naturalHeight;
+  if (!r || !nw || !nh) { // cannot crop: show it whole rather than not at all
+    card.style.width = card.style.height = '';
+    img.style.cssText = 'position:static;width:auto;height:auto;max-width:100%;visibility:visible';
+    return;
+  }
+  const ar = (r.w * nw) / (r.h * nh);
+  const parent = card.parentElement;
+  const avail = (parent.clientWidth || 340) / (parent.classList.contains('stage') ? 2.1 : 1) - 8;
+  const maxH = window.innerHeight * (Number(card.dataset.maxh) || 0.4);
+  const w = Math.max(120, Math.min(avail, maxH * ar, 560));
+  const k = w / (r.w * nw);
+  card.style.width = w + 'px';
+  card.style.height = w / ar + 'px';
+  img.style.cssText = `position:absolute;max-width:none;max-height:none;width:${nw * k}px;height:${nh * k}px;left:${-r.x * nw * k}px;top:${-r.y * nh * k}px;visibility:visible`;
+}
+function fixCrops() {
+  document.querySelectorAll('.imgcard[data-crop] img').forEach((i) => { if (i.complete) applyCrop(i); });
+}
+window.addEventListener('resize', fixCrops);
 function imgErr(el) {
   const i = +el.dataset.i + 1;
-  if (i < EXTS.length) { el.dataset.i = i; el.src = `/img/${el.dataset.b}.${EXTS[i]}`; return; }
+  if (i < EXTS.length) { el.dataset.i = i; el.src = imgSrc(el.dataset.b, EXTS[i]); return; }
   el.replaceWith(Object.assign(document.createElement('div'), { className: 'imgmissing', textContent: 'Image missing: img/' + el.dataset.b }));
 }
 const PRELOADED = new Set();
@@ -133,7 +171,7 @@ function preload(list) {
     const im = new Image();
     im.onload = () => { IMG_OK[b] = EXTS[i]; };
     im.onerror = () => go(b, i + 1);
-    im.src = `/img/${b}.${EXTS[i]}`;
+    im.src = imgSrc(b, EXTS[i]);
   };
   for (const b of list || []) { if (!PRELOADED.has(b)) { PRELOADED.add(b); go(b, 0); } }
 }

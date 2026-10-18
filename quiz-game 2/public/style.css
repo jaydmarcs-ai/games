@@ -244,7 +244,8 @@ body.host .qv.hasimg .imgcard { margin: 0 auto; }
 
 /* Cropped photos: only the chosen part of the picture is visible */
 .imgcard[data-crop] { position: relative; overflow: hidden; padding: 0 !important; margin: 0 auto; border-radius: 12px; }
-.imgcard[data-crop] img.qimg { visibility: hidden; border-radius: 0; }
+/* Until the crop is worked out, the full photo must not push the layout around */
+.imgcard[data-crop] img.qimg { visibility: hidden; border-radius: 0; position: absolute; left: 0; top: 0; width: 1px; height: 1px; max-width: none; max-height: none; }
 
 /* Cropped-photo questions: the reveal shows the whole photo, large, beside the scoreboard */
 .revbig { margin-bottom: 1em; }
@@ -263,3 +264,31 @@ body.host .qv.hasimg .imgcard { margin: 0 auto; }
 
 .numhint small { display: block; margin-top: .4em; font-size: .6em; font-weight: 600; }
 #bar .ansnum { width: 14em; max-width: 40vw; padding: .75em 1em; font-size: 1.1em; font-weight: 800; text-align: center; }
+
+/* ---------- Picture page (/images) ---------- */
+.picpage { max-width: 1150px; margin: 0 auto; padding: 1.6vw 3vw 80px; }
+.picpage h1 { font-size: clamp(26px, 3vw, 48px); font-weight: 900; margin-bottom: .3em; }
+.picpage .lead { color: var(--paper); margin-bottom: 1em; }
+.picsec { margin-top: 2em; }
+.picsec h2 { font-size: 1.5em; margin-bottom: .2em; }
+.picsec h2 small { font-size: .6em; color: var(--mute); margin-left: .6em; font-weight: 700; }
+.picsec .note { color: var(--mute); max-width: 46em; margin: .3em 0 .8em; }
+.picsec .bulk { display: inline-block; margin-bottom: .2em; cursor: pointer; }
+.slotgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 1em; }
+.slotcard { background: var(--haze); border-radius: 14px; padding: 12px; display: grid; gap: 8px; align-content: start; }
+.slotcard .pv { height: 130px; display: grid; place-items: center; background: #f6f2ff; border-radius: 10px; overflow: hidden; }
+.slotcard .pv img { max-width: 100%; max-height: 100%; }
+.slotcard .pv img.ph { opacity: .5; }
+.slotcard .who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.slotcard .num { background: var(--haze2); border-radius: 6px; padding: 1px 8px; font-weight: 900; color: var(--mute); }
+.chip { margin-left: auto; font-size: .75em; font-weight: 800; border-radius: 999px; padding: 2px 10px; }
+.chip.ok { background: var(--aqua); color: var(--ink); }
+.chip.todo { background: var(--haze2); color: var(--mute); }
+.slotcard .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.small { padding: .5em 1em; font-size: .85em; cursor: pointer; }
+.cropprev { background: var(--ink); border-radius: 10px; padding: 8px; }
+.cropprev small { display: block; color: var(--mute); font-weight: 700; margin-bottom: 6px; }
+.picsbody .top a { color: var(--paper); }
+
+.slotcard { min-width: 0; }
+.cropprev { overflow: hidden; }

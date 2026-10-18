@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Quiz: Pictures</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="host picsbody">
+<div id="conn" class="conn" hidden>Reconnecting…</div>
+<div id="app"></div>
+<div id="toast" class="toast" hidden style="bottom:24px"></div>
+<script src="/shared.js"></script>
+<script>
+// The host's picture page: add the logos and the celebrity photos without touching GitHub.
+let KEY = sessionStorage.getItem('quizKey') || '';
+let slots = [];                 // [{ slot, label, round, crop, uploaded }]
+const working = new Map();      // slot -> short message while it uploads
+const stamp = {};               // slot -> when its picture last changed (so the preview refreshes)
+let toastTimer, progress = '';
+const app = $('#app');
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 6000);
+}
+const api = (action, body) => post('/api/admin/' + action, body, { 'x-admin-key': KEY });
+
+function gate(msg) {
+  app.innerHTML = `<main class="gate">
+    <h1>Host sign-in</h1>
+    <p>Enter the admin PIN to add pictures.</p>
+    <form id="gf">
+      <input id="pin" inputmode="numeric" autocomplete="off" placeholder="Admin PIN" autofocus>
+      <button class="btn go">Continue</button>
+    </form>
+    <p class="err">${esc(msg || '')}</p></main>`;
+  $('#gf').onsubmit = async (e) => {
+    e.preventDefault();
+    KEY = $('#pin').value.trim();
+    try { await load(); sessionStorage.setItem('quizKey', KEY); } catch (err) { gate(err.message); }
+  };
+}
+
+async function load() {
+  const r = await api('slots');
+  slots = r.slots;
+  render();
+}
+
+// ---------- Making the picture small enough to upload ----------
+function loadViaImg(file) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => ok(im);
+    im.onerror = () => bad(new Error('That picture format is not supported. Try a JPG or PNG.'));
+    im.src = url;
+  });
+}
+
+async function prepare(file, slot) {
+  const logo = slot.startsWith('logos/');
+  if (file.type === 'image/svg+xml' || /\.svg$/i.test(file.name)) {
+    if (file.size > 800000) throw new Error('That SVG file is too big.');
+    return { type: 'image/svg+xml', blob: file };
+  }
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch (e) { bmp = await loadViaImg(file); }
+  const w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight;
+  const k = Math.min(1, (logo ? 900 : 1100) / Math.max(w, h));       // shrink big photos; small ones stay as they are
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  const ctx = c.getContext('2d');
+  const keepSeeThrough = logo && /png|webp|gif/.test(file.type);      // logos can have a see-through background
+  if (!keepSeeThrough) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height); }
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  let type = keepSeeThrough ? 'image/png' : 'image/jpeg';
+  let blob = await new Promise((r) => c.toBlob(r, type, 0.9));
+  if (blob && blob.size > 3500000) { type = 'image/jpeg'; blob = await new Promise((r) => c.toBlob(r, type, 0.7)); }
+  if (!blob) throw new Error('Could not read that picture. Try a JPG or PNG.');
+  return { type, blob };
+}
+
+const toBase64 = (blob) => new Promise((ok, bad) => {
+  const fr = new FileReader();
+  fr.onload = () => ok(String(fr.result).split(',')[1]);
+  fr.onerror = () => bad(new Error('Could not read that file.'));
+  fr.readAsDataURL(blob);
+});
+
+async function uploadOne(slot, file) {
+  const s = slots.find((x) => x.slot === slot);
+  working.set(slot, 'Uploading…'); refreshCard(slot);
+  try {
+    const { type, blob } = await prepare(file, slot);
+    await api('imageput', { slot, contentType: type, data: await toBase64(blob) });
+    s.uploaded = true;
+    stamp[slot] = Date.now();
+    return true;
+  } catch (e) {
+    toast(`${s.label}: ${e.message}`);
+    return false;
+  } finally {
+    working.delete(slot); refreshCard(slot);
+  }
+}
+
+// Several files at once: a file is matched to a slot by the number in its name (01.jpg, 2.png, face-03.jpeg).
+async function uploadMany(section, files) {
+  const list = [...files];
+  const skipped = [];
+  let added = 0;
+  for (let i = 0; i < list.length; i++) {
+    const m = list[i].name.replace(/\.[^.]+$/, '').match(/(\d+)/);
+    const slot = m ? `${section}/${String(Number(m[1])).padStart(2, '0')}` : null;
+    if (!slot || !slots.some((s) => s.slot === slot)) { skipped.push(list[i].name); continue; }
+    progress = `Uploading ${i + 1} of ${list.length}…`; updateCounts();
+    if (await uploadOne(slot, list[i])) added++;
+  }
+  progress = '';
+  updateCounts();
+  toast(`Added ${added} picture${added === 1 ? '' : 's'}.` + (skipped.length ? ` Skipped ${skipped.length} (no matching number in the name): ${skipped.slice(0, 4).join(', ')}${skipped.length > 4 ? '…' : ''}` : ''));
+}
+
+// ---------- Page ----------
+function card(s) {
+  const num = s.slot.split('/')[1];
+  const busyMsg = working.get(s.slot);
+  const face = s.slot.startsWith('faces/');
+  const preview = s.uploaded
+    ? `<img src="/api/image?slot=${encodeURIComponent(s.slot)}&t=${stamp[s.slot] || 0}" alt="${esc(s.label)}">`
+    : `<img class="ph" src="/img/${esc(s.slot)}.svg" alt="placeholder">`;
+  const crop = face && s.uploaded && s.crop
+    ? `<div class="cropprev"><small>Shown as "${esc(typeof s.crop === 'string' ? s.crop : 'custom')}" while the question is open</small>${imgHTML(s.slot, s.crop, 0.12)}</div>` : '';
+  return `<article class="slotcard" id="card-${esc(s.slot.replace('/', '-'))}">
+    <div class="pv">${preview}</div>
+    <div class="who"><span class="num">${esc(num)}</span><b>${esc(s.label)}</b><span class="chip ${s.uploaded ? 'ok' : 'todo'}">${busyMsg || (s.uploaded ? 'Added' : 'Not added')}</span></div>
+    ${crop}
+    <div class="acts">
+      <label class="btn small go">${s.uploaded ? 'Replace' : 'Choose picture'}<input type="file" accept="image/*" hidden data-up="${esc(s.slot)}"></label>
+      ${s.uploaded ? `<button class="btn small ghost" data-del="${esc(s.slot)}">Remove</button>` : ''}
+    </div>
+  </article>`;
+}
+
+function section(title, key, note) {
+  const list = slots.filter((s) => s.slot.startsWith(key + '/'));
+  return `<section class="picsec">
+    <h2>${title} <small id="count-${key}">${list.filter((s) => s.uploaded).length} of ${list.length} added</small></h2>
+    <p class="note">${note}</p>
+    <label class="btn go bulk">Choose many pictures at once<input type="file" accept="image/*" multiple hidden data-many="${key}"></label>
+    <p class="note">For several at once, name the files by number: 01, 02, 03 and so on (01.jpg, 02.png). Each goes to the slot with that number.</p>
+    <div class="slotgrid">${list.map(card).join('')}</div>
+  </section>`;
+}
+
+function leadHTML() {
+  const done = slots.filter((s) => s.uploaded).length;
+  return `<b>${done} of ${slots.length}</b> pictures added.${progress ? ' ' + esc(progress) : ''} A slot with no picture shows a grey placeholder in the game.`;
+}
+
+function updateCounts() {
+  $('#lead').innerHTML = leadHTML();
+  for (const key of ['logos', 'faces']) {
+    const list = slots.filter((s) => s.slot.startsWith(key + '/'));
+    $('#count-' + key).textContent = `${list.filter((s) => s.uploaded).length} of ${list.length} added`;
+  }
+}
+
+function wire(root) {
+  root.querySelectorAll('[data-up]').forEach((el) => { el.onchange = () => { if (el.files[0]) uploadOne(el.dataset.up, el.files[0]); }; });
+  root.querySelectorAll('[data-many]').forEach((el) => { el.onchange = () => { if (el.files.length) uploadMany(el.dataset.many, el.files); }; });
+  root.querySelectorAll('[data-del]').forEach((el) => {
+    el.onclick = async () => {
+      const s = slots.find((x) => x.slot === el.dataset.del);
+      if (!confirm(`Remove the picture for ${s.label}?`)) return;
+      try { await api('imagedelete', { slot: s.slot }); s.uploaded = false; stamp[s.slot] = Date.now(); } catch (e) { toast(e.message); }
+      refreshCard(s.slot);
+    };
+  });
+}
+
+// Redraw one card only (a full redraw would reload every preview picture).
+function refreshCard(slot) {
+  const old = $('#card-' + slot.replace('/', '-'));
+  if (!old) return;
+  const fresh = document.createElement('div');
+  fresh.innerHTML = card(slots.find((s) => s.slot === slot));
+  const el = fresh.firstElementChild;
+  old.replaceWith(el);
+  wire(el);
+  updateCounts();
+  fixCrops();
+}
+
+function render() {
+  app.innerHTML = `<header class="top"><span class="brand">Guess the Quiz</span><span>Pictures</span><a href="/host">Back to the host screen</a></header>
+  <main class="picpage">
+    <h1>Add the logo and celebrity pictures</h1>
+    <p class="lead" id="lead">${leadHTML()}</p>
+    ${section('Logos (round 3)', 'logos', 'Use a clear picture of the logo on a plain or see-through background.')}
+    ${section('Celebrities (round 4)', 'faces', 'Use a normal portrait: head and shoulders, face in the middle, upright. While the question is open the game shows only part of the face (the eyes, the smile or half the face), then the whole photo with the answer. Check the preview under each photo.')}
+  </main>`;
+  wire(app);
+  fixCrops();
+}
+
+if (KEY) load().catch(() => { KEY = ''; sessionStorage.removeItem('quizKey'); gate(); });
+else gate();
+</script>
+</body>
+</html>

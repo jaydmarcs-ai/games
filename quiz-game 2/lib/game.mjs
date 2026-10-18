@@ -78,6 +78,12 @@ for (const r of ROUNDS) {
   for (const c of r.categories || []) for (const q of c.questions) if (q.type === 'number' && q.answer === null) LIVE_ANSWER_QUESTIONS.push(q.text);
 }
 
+// Every picture the game can show: one slot per image question, like "logos/01". The host's picture
+// page lists these (with the answer, so the host knows what to upload) and only these slots are accepted.
+export const IMAGE_SLOTS = ROUNDS.filter((r) => r.kind === 'image').flatMap((r) =>
+  r.items.map((it) => ({ slot: it.image, label: it.answer, round: r.title, crop: it.crop ?? r.crop ?? null })));
+export const IMAGE_SLOT_SET = new Set(IMAGE_SLOTS.map((s) => s.slot));
+
 // Claim rounds: each team that claims a category answers this many of its questions.
 const claimPer = (r) =>
   Math.min(Number(r.perTeam) > 0 ? Number(r.perTeam) : Infinity, ...r.categories.map((c) => c.questions.length));

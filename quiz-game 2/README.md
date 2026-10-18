@@ -127,6 +127,22 @@ About one function call per second per screen while a question is open: roughly 
 plus the host, around 36,000 an hour. During the 30 minute break it drops to about 2 per second. Change the
 numbers in `pollDelay()` in `public/shared.js` to trade speed for fewer calls.
 
+## Adding the logo and celebrity pictures (the easy way)
+Open `https://YOUR-SITE.netlify.app/images` (there is also a button for it in the host's lobby) and enter the admin PIN.
+The page lists all 38 pictures with the name each one must show (20 logos, 18 celebrities).
+
+- **One at a time:** press **Choose picture** on a card and pick the file from your computer or phone.
+- **Many at once:** press **Choose many pictures at once** and select all the files together. Name them by number
+  (`01.jpg`, `02.png`, `logo-3.png`): each goes to the slot with that number. Files without a number are skipped
+  and listed.
+- Big photos are shrunk automatically. PNG, JPG, WEBP and SVG all work. A PNG logo keeps its see-through background.
+- Celebrity cards show a preview of how the photo will be cropped during the question. If the face is not where
+  the crop expects it, use a different photo (or set a custom crop, see below).
+- **Replace** swaps a picture, **Remove** puts the grey placeholder back. Changes are live straight away, no
+  redeploy needed.
+- Uploaded pictures are used first. If a slot has no upload, the game falls back to a file in `public/img/` (the
+  grey placeholders live there, and you can still add real files there through GitHub instead).
+
 ## Typed-number questions (the JW category)
 Some questions are answered by typing a number on the team's phone, for example "How many books are in the Bible?".
 In `questions/quiz.json` they look like this:
