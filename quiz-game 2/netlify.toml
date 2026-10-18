@@ -7,3 +7,9 @@
   from = "/host"
   to = "/host.html"
   status = 200
+
+# The host's picture page lives at /images
+[[redirects]]
+  from = "/images"
+  to = "/images.html"
+  status = 200
